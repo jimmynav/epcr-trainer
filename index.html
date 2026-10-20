@@ -1,0 +1,1436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Field ePCR Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: two-pane workstation. Left = patient care sim, right = ePCR chart. One deliberate light theme (clinical software). */
+:root{
+  --ink:#16202c; --ink-2:#4a5868; --ink-3:#7a8796;
+  --bg:#e9edf2; --panel:#ffffff; --panel-2:#f5f7fa; --line:#d5dce4; --line-2:#e6ebf0;
+  --navy:#14324f; --navy-2:#1e4a73; --accent:#1f7a8c; --accent-soft:#e0f0f3;
+  --warn:#b26a00; --warn-soft:#fff3dd; --bad:#b3261e; --bad-soft:#fde8e6; --good:#2e7d4f; --good-soft:#e3f3e9;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:13px/1.4 var(--sans);color:var(--ink);background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+
+/* ---------- top bar ---------- */
+.topbar{height:44px;background:var(--navy);color:#fff;display:flex;align-items:center;gap:16px;padding:0 14px}
+.brand{font-weight:700;letter-spacing:.02em;font-size:14px;display:flex;align-items:center;gap:8px}
+.brand .tag{font-size:10px;font-weight:600;background:#ffffff22;padding:2px 6px;border-radius:3px;letter-spacing:.08em}
+.topbar .spacer{flex:1}
+.topbar .who{font-size:12px;opacity:.85}
+.tb-btn{background:#ffffff18;border:1px solid #ffffff30;color:#fff;border-radius:4px;padding:5px 10px;font-size:12px}
+.tb-btn:hover{background:#ffffff28}
+
+/* ---------- start screen ---------- */
+.start{max-width:880px;margin:28px auto;padding:0 16px}
+.start h1{font-size:22px;margin:0 0 4px}
+.start p.lead{color:var(--ink-2);margin:0 0 18px;max-width:62ch}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px}
+.start .card{padding:18px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+label.lbl{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);margin-bottom:4px}
+.inp{width:100%;border:1px solid var(--line);border-radius:4px;padding:6px 8px;background:#fff}
+.inp:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 2px var(--accent-soft)}
+.inp.ro{background:var(--panel-2);color:var(--ink-2);cursor:default}
+.inp.bad{border-color:var(--bad);background:var(--bad-soft)}
+.uto{display:flex;gap:5px;align-items:center;font-size:11.5px;color:var(--ink-2);margin-top:3px}
+.inp:disabled{background:var(--panel-2)}
+.cadtag{font-size:9.5px;font-weight:700;letter-spacing:.06em;color:var(--accent);margin-left:4px}
+.sc-list{display:grid;gap:10px;margin:8px 0 18px}
+.sc{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--line);border-radius:6px;background:var(--panel-2);cursor:pointer;text-align:left}
+.sc:hover{border-color:var(--accent)}
+.sc.sel{border-color:var(--accent);background:var(--accent-soft)}
+.sc .code{font-family:var(--mono);font-size:11px;background:var(--navy);color:#fff;padding:2px 6px;border-radius:3px;white-space:nowrap}
+.sc .t{font-weight:600}
+.sc .d{color:var(--ink-2);font-size:12px}
+.sc .resume{font-size:11px;color:var(--warn);font-weight:600}
+.btn{border:1px solid var(--line);background:#fff;border-radius:4px;padding:7px 12px;font-weight:500}
+.btn:hover{border-color:var(--ink-3)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:#196675}
+.btn.primary:disabled{background:#9bbcc3;border-color:#9bbcc3;cursor:not-allowed}
+.btn.danger{color:var(--bad);border-color:#e9b4b0}
+.howto{margin-top:18px;font-size:12px;color:var(--ink-2)}
+.howto ol{margin:6px 0 0;padding-left:18px}
+.howto li{margin:3px 0}
+
+/* ---------- workstation ---------- */
+.ws{display:grid;grid-template-columns:minmax(440px,45%) 1fr;gap:8px;padding:8px;height:calc(100% - 44px)}
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+
+/* left: sim */
+.simhead{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+.clock{font-family:var(--mono);font-size:22px;font-weight:600;letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.phase{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:3px;background:var(--navy);color:#fff}
+.phase.scene{background:#5b6b7c}.phase.care{background:var(--accent)}.phase.transport{background:var(--warn)}.phase.arrived,.phase.done{background:var(--good)}
+.simhead .sp{flex:1}
+.simhead .elapsed{font-size:11px;color:var(--ink-2);text-align:right}
+.dispatch{padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px}
+.dispatch summary{cursor:pointer;font-weight:600;list-style:none;display:flex;gap:8px;align-items:center}
+.dispatch summary::-webkit-details-marker{display:none}
+.dispatch summary .chev{transition:transform .15s;display:inline-block;color:var(--ink-3)}
+.dispatch[open] summary .chev{transform:rotate(90deg)}
+.dgrid{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin-top:6px}
+.dgrid dt{color:var(--ink-3);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-top:1px}
+.dgrid dd{margin:0}
+.cad{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:6px}
+.cad div{background:var(--panel-2);border:1px solid var(--line-2);border-radius:3px;padding:3px 6px}
+.cad b{display:block;font-size:10px;color:var(--ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.ptcard{padding:8px 10px;border-bottom:1px solid var(--line);display:grid;gap:6px}
+.present{font-size:13px;line-height:1.45}
+.present .who{font-weight:600}
+.vchips{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.vchip{border:1px solid var(--line-2);background:var(--panel-2);border-radius:4px;padding:3px 5px;min-width:0}
+.vchip b{display:block;font-size:9.5px;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase}
+.vchip span{font-family:var(--mono);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.vchip i{display:block;font-style:normal;font-size:9.5px;color:var(--ink-3);font-family:var(--mono)}
+.actions{border-bottom:1px solid var(--line);display:flex;flex-direction:column}
+.atabs{display:flex;gap:0;border-bottom:1px solid var(--line);background:var(--panel-2);overflow-x:auto}
+.atab{border:0;background:none;padding:6px 10px;font-size:12px;font-weight:600;color:var(--ink-2);border-bottom:2px solid transparent;white-space:nowrap}
+.atab.on{color:var(--navy);border-bottom-color:var(--accent);background:#fff}
+.agrid{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;padding:6px;height:220px;overflow:auto;align-content:start}
+.act{display:flex;justify-content:space-between;align-items:center;gap:6px;text-align:left;border:1px solid var(--line);background:#fff;border-radius:4px;padding:5px 7px;font-size:12px;min-height:30px}
+.act:hover:not(:disabled){border-color:var(--accent);background:var(--accent-soft)}
+.act:disabled{opacity:.42;cursor:not-allowed}
+.act .cost{font-family:var(--mono);font-size:10px;color:var(--ink-3);white-space:nowrap}
+.act.done-once{border-left:3px solid var(--accent)}
+.feed{flex:1;overflow:auto;padding:6px 10px;min-height:120px;background:#fbfcfd}
+.ev{display:grid;grid-template-columns:62px 1fr;gap:8px;padding:4px 0;border-bottom:1px dashed var(--line-2);font-size:12.5px}
+.ev .tm{font-family:var(--mono);font-size:11px;color:var(--ink-3);padding-top:1px}
+.ev .act-l{font-weight:600;color:var(--navy)}
+.ev .spk{font-weight:600}
+.ev.alert{background:var(--warn-soft);border-left:3px solid var(--warn);padding-left:6px}
+.ev.sys{color:var(--ink-2);font-style:italic}
+
+/* right: ePCR */
+.pcrhead{display:flex;gap:16px;align-items:center;padding:7px 12px;background:var(--navy-2);color:#fff;font-size:12px;flex-wrap:wrap}
+.pcrhead b{font-weight:600}
+.pcrhead .k{opacity:.7;margin-right:4px}
+.pcrbody{display:grid;grid-template-columns:150px 1fr;flex:1;min-height:0}
+.snav{border-right:1px solid var(--line);background:var(--panel-2);overflow:auto;padding:6px 0}
+.snav button{display:flex;align-items:center;justify-content:space-between;width:100%;border:0;background:none;text-align:left;padding:7px 12px;font-size:12.5px;color:var(--ink-2);border-left:3px solid transparent}
+.snav button.on{background:#fff;color:var(--navy);font-weight:600;border-left-color:var(--accent)}
+.snav .dot{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.snav .dot.miss{background:var(--bad)}.snav .dot.ok{background:var(--good)}
+.sect{overflow:auto;padding:12px 14px 24px;min-width:0}
+.sect h2{font-size:15px;margin:0 0 2px;color:var(--navy)}
+.sect .hint{font-size:12px;color:var(--ink-3);margin:0 0 12px}
+.g{display:grid;gap:10px 12px;margin-bottom:12px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.req::after{content:" *";color:var(--bad)}
+fieldset{border:1px solid var(--line);border-radius:5px;padding:8px 10px 10px;margin:0 0 12px}
+legend{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-2);padding:0 4px}
+.checks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px 10px;font-size:12.5px}
+.checks label{display:flex;gap:6px;align-items:center}
+.exam-row{display:grid;grid-template-columns:130px 150px 1fr;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line-2)}
+.exam-row .nm{font-weight:500}
+table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
+table.grid th{font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);text-align:left;padding:4px;border-bottom:1px solid var(--line);background:var(--panel-2)}
+table.grid td{padding:3px;border-bottom:1px solid var(--line-2)}
+table.grid .inp{padding:4px 5px}
+.tbl-wrap{overflow-x:auto}
+.xbtn{border:0;background:none;color:var(--bad);font-size:16px;line-height:1;padding:2px 6px}
+textarea.inp{resize:vertical;min-height:70px}
+#f_narrative{min-height:300px;font-family:var(--sans);line-height:1.5}
+.wc{font-size:11px;color:var(--ink-3);text-align:right;margin-top:3px}
+.valist{list-style:none;padding:0;margin:0 0 14px;display:grid;gap:4px}
+.valist li{padding:6px 8px;border-radius:4px;font-size:12.5px;display:flex;gap:8px;align-items:center}
+.valist li.miss{background:var(--bad-soft);color:var(--bad)}
+.valist li.ok{background:var(--good-soft);color:var(--good)}
+.valist button{margin-left:auto;font-size:11px;border:1px solid currentColor;background:#fff;color:inherit;border-radius:3px;padding:1px 6px}
+.note{background:var(--warn-soft);border:1px solid #f0d49c;border-radius:5px;padding:8px 10px;font-size:12.5px;margin-bottom:12px}
+.note.info{background:var(--accent-soft);border-color:#b8dbe2}
+.codebox{font-family:var(--mono);font-size:10px;word-break:break-all;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;padding:8px;max-height:110px;overflow:auto}
+.rowbtns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* modal */
+.scrim{position:fixed;inset:0;background:#0b1622aa;display:flex;align-items:center;justify-content:center;z-index:50}
+.modal{background:#fff;border-radius:6px;width:min(460px,92vw);padding:16px;box-shadow:0 12px 40px #0006}
+.modal h3{margin:0 0 10px;font-size:15px;color:var(--navy)}
+.modal .g{margin-bottom:14px}
+.toast{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:8px 14px;border-radius:4px;font-size:12.5px;z-index:60}
+
+/* print view (fallback when a new window can't open) */
+#printView{display:none}
+@media print{
+  body{background:#fff}
+  #app,.toast,.scrim{display:none!important}
+  #printView{display:block}
+}
+@media (max-width:980px){
+  .ws{grid-template-columns:1fr;height:auto}
+  .pane{min-height:620px}
+  .vchips{grid-template-columns:repeat(4,1fr)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="brand">FIELD ePCR TRAINER <span class="tag">BLS · STUDENT</span></div>
+    <div class="spacer"></div>
+    <div class="who" id="whoLbl"></div>
+    <button class="tb-btn" id="btnRestart" hidden>Exit scenario</button>
+  </div>
+
+  <!-- ===== start screen ===== -->
+  <div id="startScreen" class="start">
+    <h1>Scenario-based documentation practice</h1>
+    <p class="lead">Run the call on the left, chart it on the right. The clock only moves when you act: every assessment, question, and treatment takes realistic time. Your chart is compared against what actually happened on the call, so document what you did, when you did it.</p>
+    <div class="card">
+      <div class="field-row">
+        <div><label class="lbl req" for="s_name">Student name</label><input class="inp" id="s_name" autocomplete="name"></div>
+        <div><label class="lbl req" for="s_id">Student ID</label><input class="inp" id="s_id"></div>
+      </div>
+      <label class="lbl">Select your call</label>
+      <div class="sc-list" id="scList"></div>
+      <div class="note" id="storeWarn" hidden>This browser is blocking saved progress. If you refresh or leave the page, your call will be lost. Tell your instructor.</div>
+      <p style="font-size:12px;color:var(--ink-2);margin:0 0 12px">Each call can be run <b>once</b>. If you leave, picking the call again resumes it. It can't be restarted.</p>
+      <div class="rowbtns"><button class="btn primary" id="btnStart" disabled>Respond to call</button><span id="startMsg" style="font-size:12px;color:var(--ink-3)"></span></div>
+      <div class="howto">
+        <b>How this works</b>
+        <ol>
+          <li>You arrive on scene with the CAD times shown in the dispatch panel. Size up the scene before making patient contact.</li>
+          <li>Assess, question, treat, and reassess using the action buttons. Findings and patient responses appear in the call log with the time they happened.</li>
+          <li>Chart as you go or after the call. Times in your chart should match the CAD and the call log.</li>
+          <li>When the call is over, finish your chart, run the validation check, and generate your PCR. Save it as a PDF and upload it where your instructor tells you.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== workstation ===== -->
+  <div id="ws" class="ws" hidden>
+    <section class="pane" aria-label="Patient care">
+      <div class="simhead">
+        <div class="clock" id="clock">--:--:--</div>
+        <div class="phase" id="phase">On scene</div>
+        <div class="sp"></div>
+        <div class="elapsed" id="elapsed"></div>
+      </div>
+      <details class="dispatch" id="dispatch" open></details>
+      <div class="ptcard">
+        <div class="present" id="present"></div>
+        <div class="vchips" id="vchips"></div>
+      </div>
+      <div class="actions">
+        <div class="atabs" id="atabs" role="tablist"></div>
+        <div class="agrid" id="agrid"></div>
+      </div>
+      <div class="feed" id="feed" aria-live="polite"></div>
+    </section>
+
+    <section class="pane" aria-label="ePCR">
+      <div class="pcrhead" id="pcrhead"></div>
+      <div class="pcrbody">
+        <nav class="snav" id="snav"></nav>
+        <div class="sect" id="sect"></div>
+      </div>
+    </section>
+  </div>
+</div>
+<div id="printView"></div>
+<div id="modalRoot"></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   FIELD ePCR TRAINER — student file
+   Contains the simulation only. No grading key lives in this file.
+   ===================================================================== */
+const VERSION = "1.0";
+const STORE = "epcrTrainer.v1.";
+
+/* ---------------- helpers ---------------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const hms = s => { s = Math.round(s); const h = Math.floor(s/3600)%24, m = Math.floor(s/60)%60, x = s%60; return [h,m,x].map(n=>String(n).padStart(2,"0")).join(":"); };
+const hm = s => hms(s).slice(0,5);
+const toSec = str => { const [h,m,x] = str.split(":").map(Number); return h*3600+m*60+(x||0); };
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const wobble = (t,k,a) => Math.round(a*Math.sin(t/(37+k*11)+k));
+function lsGet(k){ try { return JSON.parse(localStorage.getItem(STORE+k)); } catch(e){ return null; } }
+function lsSet(k,v){ try { localStorage.setItem(STORE+k, JSON.stringify(v)); } catch(e){} }
+function lsDel(k){ try { localStorage.removeItem(STORE+k); } catch(e){} }
+function toast(msg){ const d=document.createElement("div"); d.className="toast"; d.textContent=msg; document.body.appendChild(d); setTimeout(()=>d.remove(),2400); }
+
+/* ---------------- facilities ---------------- */
+const HOSP = {
+  vincent: { name:"Vincent Community Hospital",            type:"Emergency department", min:8 },
+  spencer: { name:"Spencer's Children Hospital",           type:"Pediatric emergency department", min:10 },
+  habibi:  { name:"Habibi Bassil Regional Hospital",       type:"Emergency department", min:11 },
+  bougie:  { name:"Jimmy Bougie Medical Center",           type:"Stroke / cardiac specialty center", min:12 },
+  isabel:  { name:"Isabel Joel Memorial Hospital",         type:"Emergency department", min:13 },
+  hank:    { name:"Hank Harris Medical University Center", type:"Emergency department", min:15 },
+  theresa: { name:"Theresa University Medical Center",     type:"Trauma center (Level I)", min:16 },
+  hayden:  { name:"Hayden Swim and Spinal Center",         type:"Spinal specialty center", min:18 }
+};
+
+/* ---------------- action catalog ----------------
+   [group, id, label, seconds, rule]
+   rule: pre = before contact only; any = until call ends; (default) = after contact */
+const GROUPS = [["scene","Scene"],["primary","Primary"],["history","History"],["exam","Exam"],["vitals","Vitals"],["treat","Treat"],["transport","Transport"]];
+const ACTIONS = [
+  ["scene","ppe","Don BSI / PPE",15,"any"],
+  ["scene","scene_safe","Assess scene safety",20,"any"],
+  ["scene","num_pts","Determine number of patients",10,"any"],
+  ["scene","moi","Determine mechanism of injury (MOI)",20,"any"],
+  ["scene","noi","Determine nature of illness (NOI)",20,"any"],
+  ["scene","no_resources","No additional resources needed",10,"any"],
+  ["scene","smr_consider","Consider spinal immobilization",15,"any"],
+  ["scene","smr_no","Spinal immobilization not needed at this time",10,"any"],
+  ["scene","req_als","Request ALS",20,"any"],
+  ["scene","contact","Make patient contact",30,"pre"],
+  ["primary","gen_imp","General impression",15],
+  ["primary","avpu","Level of consciousness (AVPU)",15],
+  ["primary","airway","Assess airway",20],
+  ["primary","breathing","Assess breathing",30],
+  ["primary","lungs","Auscultate lung sounds",30],
+  ["primary","cc_lt","Determine chief complaint / life threats",20],
+  ["primary","c_pulse","Pulse: rate, rhythm, quality",30],
+  ["primary","c_skin","Skin: color, temperature, condition",15],
+  ["primary","c_bleed","Check for major bleeding",15],
+  ["primary","c_shock","Manage for shock",60],
+  ["primary","prio_high","Transport decision: priority (Code 3)",10],
+  ["primary","prio_low","Transport decision: non-priority (Code 2)",10],
+  ["primary","swallow","Gag reflex / ability to swallow",20],
+  ["primary","gcs","Determine GCS",30],
+  ["history","ask_cc","Chief complaint",20],
+  ["history","ask_id","Name / DOB / weight",20],
+  ["history","ask_o","O · Onset",20],
+  ["history","ask_p","P · Provocation / palliation",20],
+  ["history","ask_q","Q · Quality",15],
+  ["history","ask_r","R · Region / radiation",15],
+  ["history","ask_s","S · Severity",10],
+  ["history","ask_t","T · Time / duration",15],
+  ["history","ask_signs","S · Signs & symptoms",20],
+  ["history","ask_allergies","A · Allergies",15],
+  ["history","ask_meds","M · Medications",30],
+  ["history","ask_pmh","P · Past medical history",30],
+  ["history","ask_intake","L · Last oral intake",15],
+  ["history","ask_events","E · Events leading up",30],
+  ["history","ask_loc","Any loss of consciousness?",10],
+  ["history","ask_neckpain","Any neck or back pain?",10],
+  ["history","ask_anticoag","Taking blood thinners?",10],
+  ["history","ask_pde5","ED medication in last 48 h?",10],
+  ["history","ask_bystander","Talk to family / bystander",30],
+  ["exam","ex_head","Head / scalp / face",30],
+  ["exam","ex_neck","Neck / C-spine",30],
+  ["exam","ex_chest","Chest",30],
+  ["exam","ex_abd","Abdomen",30],
+  ["exam","ex_pelvis","Pelvis",20],
+  ["exam","ex_back","Back / posterior",30],
+  ["exam","ex_ue","Upper extremities",30],
+  ["exam","ex_le","Lower extremities",30],
+  ["exam","ex_pms","Distal pulse / motor / sensation",45],
+  ["exam","ex_pupils","Pupils",15],
+  ["exam","ex_stroke","Stroke screen (BE-FAST)",60],
+  ["vitals","v_set","Full set of vitals",120],
+  ["vitals","v_bgl","Blood glucose (glucometer)",60],
+  ["vitals","v_temp","Temperature",30],
+  ["vitals","v_pain","Pain scale 0–10",10],
+  ["treat","o2_nc","O₂ nasal cannula 2–4 L/min",30],
+  ["treat","o2_nrm","O₂ non-rebreather 15 L/min",30],
+  ["treat","o2_off","Discontinue O₂",10],
+  ["treat","bvm","Ventilate with BVM",60],
+  ["treat","opa","Insert OPA",20],
+  ["treat","npa","Insert NPA",20],
+  ["treat","suction","Suction airway",30],
+  ["treat","pos_semi","Position: semi-Fowler's / comfort",20],
+  ["treat","pos_recovery","Position: recovery (lateral)",20],
+  ["treat","pos_supine","Position: supine",20],
+  ["treat","oral_glucose","Oral glucose 15 g",60],
+  ["treat","aspirin","Aspirin 324 mg chewable PO",45],
+  ["treat","nitro","Assist pt's nitroglycerin 0.4 mg SL",45],
+  ["treat","naloxone","Naloxone 4 mg IN",45],
+  ["treat","epi","Epinephrine auto-injector",45],
+  ["treat","albuterol","Assist pt's albuterol MDI",60],
+  ["treat","collar","Cervical collar / SMR",120],
+  ["treat","hip_pad","Immobilize hip: padding & pillows",180],
+  ["treat","traction","Traction splint",240],
+  ["treat","realign","Realign / straighten extremity",60],
+  ["treat","scoop","Move with scoop stretcher",120],
+  ["treat","vacuum","Vacuum mattress",180],
+  ["treat","cold_pack","Cold pack",20],
+  ["treat","blanket","Keep warm (blankets)",20],
+  ["treat","bleeding","Dressing / bleeding control",60],
+  /* look-alike options: plausible on a real call, not all appropriate */
+  ["scene","req_pd","Request law enforcement",20,"any"],
+  ["scene","stage","Stage and wait for PD",300,"pre"],
+  ["scene","req_fire","Request fire / lift assist",20,"any"],
+  ["scene","req_bls","Request additional BLS unit",20,"any"],
+  ["scene","hazmat","Check for hazmat / odors",20,"any"],
+  ["scene","utilities","Check for downed lines / gas",20,"any"],
+  ["scene","mci","Declare MCI / START triage",30,"any"],
+  ["scene","base_contact","Contact base hospital",60],
+  ["scene","supervisor","Notify EMS supervisor",20,"any"],
+  ["primary","jaw_thrust","Jaw-thrust maneuver",15],
+  ["primary","med_id","Check for medical ID jewelry",15],
+  ["primary","rapid_trauma","Rapid trauma assessment",90],
+  ["primary","cap_refill","Capillary refill",10],
+  ["primary","monitor","Apply cardiac monitor",30],
+  ["history","ask_travel","Recent travel?",10],
+  ["history","ask_etoh","Alcohol / drug use?",15],
+  ["history","ask_preg","Possibility of pregnancy?",10],
+  ["history","ask_bm","Last bowel movement?",10],
+  ["history","ask_tetanus","Last tetanus shot?",10],
+  ["history","ask_polst","Advance directive / POLST?",15],
+  ["history","ask_fever","Recent fever or illness?",10],
+  ["exam","ex_trachea","Tracheal position",10],
+  ["exam","ex_edema","Pedal edema",15],
+  ["exam","ex_turgor","Skin turgor",10],
+  ["exam","ex_bowel","Bowel sounds",60],
+  ["vitals","v_ortho","Orthostatic vitals",300],
+  ["vitals","v_etco2","Capnography (EtCO₂)",30],
+  ["vitals","v_12lead","12-lead ECG",30],
+  ["treat","asa81","Aspirin 81 mg PO",30],
+  ["treat","charcoal","Activated charcoal 50 g PO",60],
+  ["treat","tourniquet","Apply tourniquet",60],
+  ["treat","pelvic_binder","Pelvic binder",120],
+  ["treat","lsb","Long spine board",240],
+  ["treat","ked","KED (short board)",240],
+  ["treat","sling","Sling & swathe",90],
+  ["treat","hot_pack","Hot pack",20],
+  ["treat","trendelenburg","Position: Trendelenburg",20],
+  ["treat","paper_bag","Coach breathing into paper bag",60],
+  ["transport","begin_transport","Package & begin transport",240],
+  ["transport","arrive","Arrive at destination",0],
+  ["transport","transfer","Transfer care & give report",180]
+];
+const ACT = Object.fromEntries(ACTIONS.map(a => [a[1], {group:a[0], id:a[1], label:a[2], cost:a[3], rule:a[4]||"pt"}]));
+
+/* Treatment choices for the chart (same ids as the actions) */
+const TX_IDS = ["o2_nc","o2_nrm","bvm","opa","npa","suction","pos_semi","pos_recovery","pos_supine","oral_glucose","aspirin","nitro","naloxone","epi","albuterol","collar","hip_pad","traction","realign","scoop","vacuum","cold_pack","blanket","bleeding",
+  "c_shock","asa81","charcoal","tourniquet","pelvic_binder","lsb","ked","sling","hot_pack","trendelenburg","paper_bag"];
+const TX_LABEL = {
+  c_shock:"Shock management (position, warmth)",
+  asa81:"Aspirin 81 mg", charcoal:"Activated charcoal", tourniquet:"Tourniquet", pelvic_binder:"Pelvic binder", lsb:"Long spine board", ked:"KED",
+  sling:"Sling & swathe", hot_pack:"Hot pack", trendelenburg:"Positioning – Trendelenburg", paper_bag:"Paper bag breathing",
+  o2_nc:"Oxygen – nasal cannula", o2_nrm:"Oxygen – non-rebreather mask", bvm:"BVM ventilation", opa:"OPA", npa:"NPA", suction:"Suction",
+  pos_semi:"Positioning – semi-Fowler's / comfort", pos_recovery:"Positioning – recovery", pos_supine:"Positioning – supine",
+  oral_glucose:"Oral glucose", aspirin:"Aspirin", nitro:"Nitroglycerin (patient-assisted)", naloxone:"Naloxone", epi:"Epinephrine auto-injector",
+  albuterol:"Albuterol MDI (patient-assisted)", collar:"Cervical collar / SMR", hip_pad:"Splint – hip (padding/pillows)", traction:"Traction splint",
+  realign:"Extremity realignment", scoop:"Scoop stretcher", vacuum:"Vacuum mattress", cold_pack:"Cold pack", blanket:"Warming (blankets)", bleeding:"Dressing / bleeding control"
+};
+const TX_RESP = {
+  o2_nc:"Nasal cannula placed at 4 L/min.", o2_nrm:"Non-rebreather placed at 15 L/min; reservoir inflated.", o2_off:"Oxygen discontinued.",
+  bvm:"You begin BVM ventilations.", opa:"Patient gags on the OPA; removed.", npa:"NPA placed; patient tolerates it.", suction:"Suctioned; minimal secretions.",
+  pos_semi:"Patient positioned semi-Fowler's / position of comfort.", pos_recovery:"Patient placed in the recovery position.", pos_supine:"Patient placed supine.",
+  collar:"Cervical collar sized and applied; patient secured for spinal motion restriction.", hip_pad:"Hip supported with pillows and blanket rolls in position of comfort; legs padded and secured together.",
+  scoop:"Scoop stretcher applied; patient lifted to the gurney with minimal hip movement.", vacuum:"Patient placed in vacuum mattress; molded and evacuated.",
+  cold_pack:"Cold pack applied over injury, wrapped.", blanket:"Patient covered with warm blankets.", bleeding:"Wound dressed and bandaged; bleeding controlled.",
+  naloxone:"Naloxone 4 mg administered intranasally.", epi:"Epinephrine auto-injector administered to lateral thigh.", albuterol:"No inhaler is available for this patient.",
+  traction:"Traction splint applied.", realign:"You attempt to straighten the extremity.",
+  asa81:"Patient chews one 81 mg aspirin.", charcoal:"Patient drinks the charcoal slurry.", tourniquet:"Tourniquet applied and tightened.",
+  pelvic_binder:"Pelvic binder applied and tightened.", lsb:"Patient log-rolled and secured to a long spine board.", ked:"KED applied.",
+  sling:"Sling and swathe applied.", hot_pack:"Hot pack applied.", trendelenburg:"Patient placed supine with legs elevated.", paper_bag:"Patient coached to breathe into a paper bag."
+};
+/* Responses for look-alike options that aren't in the treat group. Scenario files can override with s.dx[id]. */
+const DX = {
+  req_pd:"Dispatch: \"Copy. PD en route, ETA 15 minutes.\"",
+  stage:"You stage around the corner. After 5 minutes dispatch advises: \"Scene was reported safe; no PD assigned.\" You proceed in.",
+  req_fire:"Dispatch: \"Copy. Engine responding, ETA 8 minutes.\"",
+  req_bls:"Dispatch: \"Copy. Additional BLS unit assigned.\"",
+  hazmat:"No unusual odors, containers, or placards.", utilities:"No downed lines, no gas odor.",
+  mci:"One patient. MCI not indicated.", base_contact:"Base hospital: \"BLS unit, no orders needed. Treat and transport per protocol.\"",
+  supervisor:"Supervisor acknowledges.", cap_refill:"(computed)", jaw_thrust:"Jaw-thrust performed.", med_id:"No medical ID jewelry found.",
+  rapid_trauma:"Rapid head-to-toe sweep: no immediate life threats found. Use focused exams to document specific findings.",
+  monitor:"There is no cardiac monitor on this BLS unit. ECG interpretation is outside EMT scope.",
+  ask_travel:[["Patient","No."]], ask_etoh:[["Patient","No."]], ask_preg:[["Patient","No."]], ask_bm:[["Patient","This morning. Normal."]],
+  ask_tetanus:[["Patient","I don't remember."]], ask_polst:[["Patient","No, nothing like that."]], ask_fever:[["Patient","No."]],
+  ex_trachea:"Trachea midline.", ex_edema:"No pedal edema.", ex_turgor:"Skin turgor normal.", ex_bowel:"Bowel sounds present.",
+  v_ortho:"Patient can't safely stand for orthostatic vitals.", v_etco2:"Capnography isn't carried on this BLS unit.",
+  v_12lead:"12-lead ECG isn't available on this BLS unit."
+};
+
+/* =====================================================================
+   SCENARIOS (physiology + scripted findings). No grading here.
+   compute(m, F): patient state at m minutes after contact, given flags F.
+   ===================================================================== */
+function txAt(F, id){ return F.tx.filter(x => x.id === id); }
+function firstTx(F, ids){ ids = [].concat(ids); const l = F.tx.filter(x => ids.includes(x.id)); return l.length ? l[0].m : null; }
+function o2At(F, m){ // current O2 mode at minute m
+  let mode = null;
+  for (const x of F.tx) { if (x.m > m) break; if (x.id === "o2_nc") mode = "nc"; else if (x.id === "o2_nrm") mode = "nrm"; else if (x.id === "o2_off") mode = null; }
+  return mode;
+}
+const PT = (t) => [["Patient", t]];
+
+const SCEN = {
+/* ---------------------------------------------------------------- AMS */
+ams: {
+  id:"ams", code:"3", nature:"Sick person – altered mental status",
+  incident:"26-104871", unit:"M-62 (BLS)", address:"2219 E Linden Ct (residence)", caller:"Husband",
+  notes:"62 y/o F confused and sweating. Caller states pt is diabetic. Conscious, breathing.",
+  cad:{ psap:"13:52:14", disp:"13:53:02", enroute:"13:53:40", onscene:"14:00:51" },
+  triageRN:"Dana Whitfield, RN", 
+  dx:{ med_id:"Medical alert bracelet: \"Diabetic – insulin dependent.\"", ask_etoh:[["Husband","She doesn't drink."]], ask_preg:[["Husband","No. She's 62."]],
+       ask_polst:[["Husband","No, nothing like that."]], ask_travel:[["Husband","No."]], ask_fever:[["Husband","No, she's been fine."]], ask_bm:[["Husband","I don't know."]],
+       ask_tetanus:[["Husband","No idea."]] },
+  ptHeader:"Adult female", scene:"Single-story home. The husband meets you at the door and leads you to the living room. The patient is sitting on the couch with the TV on.",
+  sceneSafe:"Scene is safe. No hazards. Husband is calm and cooperative. A dog is secured in the backyard.",
+  numPts:"One patient.", moi:"No mechanism of injury. Husband states she did not fall.", noi:"Nature of illness: altered mental status.",
+  ccLt:"Chief complaint: altered mental status (per husband). No immediate life threats; airway open for now, but she is confused.",
+  smr:"No trauma reported. Spinal motion restriction not indicated unless that changes.",
+  compute(m, F){
+    const doses = F.tx.filter(x => x.id === "oral_glucose" && x.eff);
+    const base = mm => Math.max(30, 42 - 0.5*mm);
+    let bgl = base(m);
+    if (doses.length){
+      const g = doses[0].m, b0 = base(g);
+      if (m >= g + 2) bgl = b0 + Math.min(55, (m - g - 2) * 5);
+      if (doses[1] && m >= doses[1].m + 2) bgl += Math.min(22, (m - doses[1].m - 2) * 3);
+      if (bgl < base(m)) bgl = base(m);
+    }
+    bgl = Math.round(clamp(bgl, 28, 150));
+    let E=4,V=4,M=6;
+    if (bgl >= 70) V = 5; else if (bgl >= 38) V = 4; else if (bgl >= 34) V = 3; else { E = 3; V = 2; M = 5; }
+    const swallow = bgl >= 34;
+    const low = bgl < 60;
+    const o2 = o2At(F, m);
+    let spo2 = (E+V+M) <= 11 ? 94 : 97;
+    if (o2 === "nc") spo2 = 99; if (o2 === "nrm") spo2 = 100;
+    if ((E+V+M) <= 11 && txAt(F,"pos_recovery").length && !o2) spo2 = 96;
+    return {
+      hr: low ? 108 + Math.round((42 - Math.min(bgl,42)) * 0.8) : Math.max(88, 108 - Math.round((bgl - 60) * 0.5)),
+      sbp: low ? 148 : 138, dbp: low ? 88 : 82, rr: (E+V+M) <= 11 ? 14 : (low ? 18 : 16), spo2, bgl,
+      E, V, M, swallow, pain: 0, temp: 97.9, tempRoute:"oral",
+      skin: bgl < 60 ? "pale, cool, diaphoretic" : bgl < 75 ? "pale, warm, moist" : "pink, warm, dry",
+      pulseQ:"regular, strong", pupils:"PERRL, 4 mm, brisk", lungs:"Clear and equal bilaterally."
+    };
+  },
+  present(S){
+    if (S.E < 4) return "Patient is slumped on the couch, eyes closed, opens eyes only to loud voice and mumbles. Skin is pale and wet. Snoring respirations.";
+    if (S.bgl < 55) return "62 y/o female sitting on the couch, eyes open, staring. Slow to respond, mumbling. Skin is pale and sweaty.";
+    if (S.bgl < 70) return "Patient is more alert and answering slowly. Still sweaty.";
+    return "Patient is alert, talking, and apologizing for the trouble. Color is improving.";
+  },
+  confused: S => S.V < 5,
+  primary:{
+    gen_imp:"Adult female, looks ill. Altered and diaphoretic. Airway open, breathing adequately. No obvious trauma.",
+    airway:S => S.swallow ? "Patent. No secretions. No abnormal airway sounds. Speaking in short, confused phrases, not full sentences." : "Snoring respirations with secretions pooling in the mouth. Not phonating; only moans. Airway at risk.",
+    breathing:S => `RR ${S.rr}, adequate depth, unlabored.`,
+    swallow:S => S.swallow ? "Gag reflex intact. Patient swallows on command." : "Patient cannot follow the command to swallow; weak gag. Not safe for anything by mouth."
+  },
+  ask(id, S){
+    const conf = S.V < 5, out = S.E < 4;
+    if (out && id !== "ask_bystander") {
+      const hus = { ask_allergies:"Penicillin. She breaks out in hives.", ask_meds:"Insulin: Lantus at night, Humalog with meals. Also metformin and lisinopril.",
+        ask_pmh:"Type 2 diabetes for about 20 years, and high blood pressure.", ask_intake:"She took her Humalog around noon. I don't think she ate lunch.",
+        ask_events:"She was watching TV, then around 1:30 she started sweating and talking nonsense. She didn't fall.", ask_id:"Her name is Linda Okafor, last name O-K-A-F-O-R. Birthday is February 9th, 1964. She's about 75 kilograms.", ask_signs:"She got sweaty and started talking nonsense around 1:30, so about half an hour ago.",
+        ask_loc:"She never fully passed out until just now.", ask_anticoag:"No blood thinners.", ask_pde5:"No." };
+      return [["Patient","(no meaningful response)"]].concat(hus[id] ? [["Husband", hus[id]]] : []);
+    }
+    const H = (t) => [["Husband", t]];
+    const map = conf ? {
+      ask_cc:[["Patient","I'm fine... just tired. Is it lunch?"]],
+      ask_id:[["Patient","Linda."],["Husband","Linda Okafor, last name O-K-A-F-O-R. Her birthday is February 9th, 1964. She's about 75 kilograms."]],
+      ask_o:PT("Huh? ...I don't know."), ask_p:PT("(stares, does not answer)"), ask_q:PT("I'm just... fuzzy."), ask_r:PT("No... nothing hurts."), ask_s:PT("(does not answer)"), ask_t:PT("I don't know what time it is."),
+      ask_signs:H("She got really sweaty and started saying weird things. She's shaky. It started around 1:30, so about half an hour ago."),
+      ask_allergies:H("Penicillin. She breaks out in hives."),
+      ask_meds:H("Insulin: Lantus at night, Humalog with meals. Also metformin and lisinopril."),
+      ask_pmh:H("Type 2 diabetes for about 20 years, and high blood pressure."),
+      ask_intake:H("She took her Humalog around noon, but I don't think she ate lunch. She said she wasn't hungry."),
+      ask_events:H("She was watching TV after lunch. Around 1:30 she started sweating and talking nonsense. She didn't fall or hit her head."),
+      ask_loc:H("No, she never passed out."), ask_neckpain:PT("(shakes head)"), ask_anticoag:H("No blood thinners."), ask_pde5:H("No.")
+    } : {
+      ask_cc:PT("I got shaky and sweaty, and then everything got foggy."),
+      ask_id:PT("Linda Okafor. Last name is O-K-A-F-O-R. February 9th, 1964. About 75 kilograms."),
+      ask_o:PT("Maybe half an hour ago I got shaky and sweaty."), ask_p:PT("Nothing made it better or worse."), ask_q:PT("No pain. Just foggy and shaky."),
+      ask_r:PT("Nothing hurts anywhere."), ask_s:PT("No pain. I feel weak, maybe a 4 out of 10 shaky."), ask_t:PT("About 30 or 40 minutes, I think."),
+      ask_signs:PT("Sweaty, shaky, confused. It started about half an hour ago. No chest pain, no headache, no trouble breathing."),
+      ask_allergies:PT("Penicillin. I get hives."), ask_meds:PT("Lantus at night, Humalog with meals, metformin, and lisinopril."),
+      ask_pmh:PT("Diabetes, about 20 years. And blood pressure."), ask_intake:PT("I took my Humalog at noon and skipped lunch. Just coffee."),
+      ask_events:PT("I was watching TV, started feeling shaky. I don't remember much after that."),
+      ask_loc:PT("I don't think I passed out."), ask_neckpain:PT("No."), ask_anticoag:PT("No."), ask_pde5:PT("No.")
+    };
+    if (id === "ask_bystander") return H("She's had type 2 diabetes for years and takes insulin. She took her Humalog at noon and skipped lunch. This happened once before, last year. She didn't fall.");
+    return map[id] || PT("No.");
+  },
+  exam:{
+    ex_head:"Atraumatic. No signs of injury.", ex_neck:"No JVD, trachea midline, no tenderness.", ex_chest:"Symmetrical rise, no trauma.",
+    ex_abd:"Soft, non-tender.", ex_pelvis:"Stable, non-tender.", ex_back:"No deformity or tenderness.", ex_ue:"No deformity. Moves both arms.", ex_le:"No deformity, no edema. Moves both legs.",
+    ex_pms:"Distal pulses, motor, and sensation intact in all four extremities.",
+    ex_stroke:S => S.V < 5 ? "Balance: not tested (seated). Eyes: normal. Face: no droop. Arms: no drift. Speech: slurred and confused." : "Negative: no facial droop, no arm drift, speech clear."
+  },
+  onTreat(id, S){
+    if (id === "oral_glucose") return S.swallow
+      ? { eff:true, text:"Oral glucose 15 g placed between cheek and gum. Patient swallows without difficulty." }
+      : { eff:false, text:"Patient cannot swallow. The gel pools in her mouth and she starts to gurgle and cough.", alert:true };
+    if (id === "opa") return S.E < 4 ? { text:"OPA inserted; patient gags and spits it out. Gag reflex present." } : null;
+    return null;
+  },
+  events:[
+    { id:"decline", when:(m,S)=> S.E < 4, text:"Patient's head drops. She no longer responds to her name. Snoring respirations.", alert:true },
+    { id:"wake", when:(m,S,F)=> S.bgl >= 70 && F.tx.some(x=>x.id==="oral_glucose"&&x.eff), text:"Patient opens her eyes fully and asks, \"What happened?\"" }
+  ]
+},
+
+/* ----------------------------------------------------------------- CP */
+cp: {
+  id:"cp", code:"3", nature:"Chest pain",
+  incident:"26-105233", unit:"M-62 (BLS)", address:"714 N Cambridge St (residence, front yard)", caller:"Wife",
+  notes:"64 y/o M chest pain, sweating. Conscious, breathing.",
+  cad:{ psap:"16:41:09", disp:"16:41:58", enroute:"16:42:31", onscene:"16:48:20" },
+  triageRN:"Marcus Lee, RN", 
+  dx:{ ask_etoh:[["Patient","A couple of beers on weekends. Nothing today."]], ask_preg:[["Patient","(laughs) No."]] },
+  ptHeader:"Adult male", scene:"Single-story home. A lawn mower sits stopped mid-yard. The patient is sitting on the front porch steps holding his chest. His wife is beside him.",
+  sceneSafe:"Scene is safe. Mower is off. No hazards.", numPts:"One patient.", moi:"No mechanism of injury.", noi:"Nature of illness: chest pain.",
+  ccLt:"Chief complaint: chest pressure. No immediate life threats identified; patient is talking in full sentences.",
+  smr:"No trauma. Spinal motion restriction not indicated.",
+  compute(m, F){
+    const o2 = o2At(F, m);
+    let hr = 92 + Math.min(8, Math.floor(m/2)), sbp = 156, dbp = 94, rr = 20, spo2 = 93, pain = m >= 12 ? 8 : 7, V = 5;
+    const semi = firstTx(F, "pos_semi");
+    if (semi !== null && m >= semi) rr = 18;
+    const supine = F.tx.filter(x=>x.id==="pos_supine" || x.id==="c_shock" || x.id==="trendelenburg");
+    if (o2 === "nc") spo2 = 97; if (o2 === "nrm") spo2 = 99;
+    if (supine.length && m >= supine[supine.length-1].m && (semi === null || supine[supine.length-1].m > semi)) { rr += 2; spo2 -= 1; }
+    const ntg = F.tx.filter(x=>x.id==="nitro");
+    let skin = "pale, cool, diaphoretic";
+    ntg.forEach((n,i) => {
+      if (m >= n.m + 2) {
+        const since = m - n.m - 2, rec = Math.min(1, since/25);
+        const drop = (i === 0 ? 70 : 22) * (1 - 0.35*rec);
+        sbp -= drop; dbp -= drop*0.55; hr += (i === 0 ? 26 : 10) * (1 - 0.3*rec); pain = Math.max(5, pain - 1);
+      }
+    });
+    if (ntg.length && m >= ntg[0].m + 2) {
+      const lastSup = supine.length ? supine[supine.length-1].m : null;
+      if (lastSup !== null && m >= lastSup) sbp += 12;
+      if (sbp < 90) { V = 4; skin = "gray, cool, diaphoretic"; }
+    }
+    return { hr:Math.round(hr), sbp:Math.round(sbp), dbp:Math.round(dbp), rr, spo2, bgl:128, E:4, V, M:6, swallow:true, pain,
+      temp:98.4, tempRoute:"oral", skin, pulseQ: sbp < 90 ? "rapid, weak" : "regular, strong", pupils:"PERRL, 3 mm", lungs:"Clear bilaterally; no crackles or wheezes." };
+  },
+  present(S){
+    if (S.sbp < 90) return "Patient suddenly looks gray. Eyes half closed, he says, \"I think I'm going to pass out.\"";
+    return "64 y/o male sitting on the porch steps clutching his chest. Pale and sweaty, speaking in full sentences.";
+  },
+  confused: S => S.V < 5,
+  primary:{
+    gen_imp:"Adult male in moderate distress. Pale and diaphoretic. Airway open; breathing slightly fast.",
+    airway:S => S.V < 5 ? "Patent. No secretions or abnormal airway sounds. Speaking in short phrases only." : "Patent. No secretions or abnormal airway sounds. Speaking in full, complete sentences.", breathing:S => `RR ${S.rr}, mildly labored, equal chest rise.`, swallow:"Gag intact; swallows normally."
+  },
+  ask(id, S){
+    const p = {
+      ask_cc:"This pressure in my chest. It's bad.", ask_id:"Daniel Whitaker, last name W-H-I-T-A-K-E-R. March 14th, 1962. About 98 kilograms.",
+      ask_o:"About 30 minutes ago while I was mowing. It didn't go away when I sat down.", ask_p:"Nothing makes it better. Walking made it worse.",
+      ask_q:"Pressure. Like someone's sitting on my chest.", ask_r:"It goes into my left arm and up into my jaw.", ask_s:`${S.pain} out of 10.`,
+      ask_t:"Constant since it started. About half an hour now.", ask_signs:"Sweaty, a little short of breath, sick to my stomach. It all started with the pressure about 30 minutes ago. No vomiting.",
+      ask_allergies:"No allergies.", ask_meds:"Metoprolol, atorvastatin, and a baby aspirin every morning. I have nitro pills from when I got my stent.",
+      ask_pmh:"Heart attack in 2019; they put a stent in. High blood pressure and high cholesterol.", ask_intake:"Coffee and toast around 8, water at noon.",
+      ask_events:"I was mowing the front lawn, got this pressure, sat down, started sweating. My wife called 911.", ask_loc:"No.",
+      ask_neckpain:"No.", ask_anticoag:"Just the baby aspirin. No other blood thinners.",
+      ask_pde5:"(hesitates, glances at his wife) ...Yeah. I took a Viagra last night, around 10."
+    };
+    if (id === "ask_bystander") return [["Wife","He's been more tired this past week. He took his baby aspirin this morning. His nitro pills are in the kitchen cabinet."]];
+    if (S.V < 5) return PT("(eyes closed) ...I feel like I'm going to pass out.");
+    return PT(p[id] || "No.");
+  },
+  exam:{
+    ex_head:"Atraumatic.", ex_neck:"No JVD. Trachea midline.", ex_chest:"No trauma; equal rise. Patient points to the center of his chest.",
+    ex_abd:"Soft, non-tender.", ex_pelvis:"Stable.", ex_back:"No tenderness.", ex_ue:"No deformity.", ex_le:"No pedal edema. No deformity.",
+    ex_pms:"Distal pulses, motor, and sensation intact ×4.", ex_stroke:"Negative: no facial droop, no arm drift, speech clear."
+  },
+  onTreat(id){
+    if (id === "aspirin") return { text:"Patient chews 4 × 81 mg baby aspirin (324 mg)." };
+    if (id === "nitro") return { text:"You help the patient take one of his own nitroglycerin 0.4 mg tablets under the tongue. (Bottle checked: his name, not expired.)" };
+    if (id === "oral_glucose") return { text:"Oral glucose given. Patient swallows it." };
+    return null;
+  },
+  events:[
+    { id:"hypotension", when:(m,S)=> S.sbp < 90, text:"Patient: \"Whoa... I feel really dizzy.\" He slumps against the railing, gray and sweaty.", alert:true }
+  ]
+},
+
+/* ---------------------------------------------------------------- FALL */
+fall: {
+  id:"fall", code:"2", nature:"Fall – injured",
+  incident:"26-106019", unit:"M-62 (BLS)", address:"3301 W Maple Ave, Unit 4 (residence)", caller:"Neighbor",
+  notes:"81 y/o F fell, unable to get up. Neighbor on scene. Conscious, breathing.",
+  cad:{ psap:"09:14:47", disp:"09:15:30", enroute:"09:16:02", onscene:"09:24:39" },
+  triageRN:"Priya Nair, RN", 
+  dx:{ med_id:"Medical alert bracelet: \"On blood thinners – Eliquis.\"", ask_polst:[["Patient","I have a POLST on the fridge. Full treatment."]],
+       ask_tetanus:[["Patient","Maybe five years ago?"]], ask_etoh:[["Patient","A glass of wine with dinner sometimes. Nothing today."]], ask_preg:[["Patient","No, dear."]],
+       ex_edema:"Trace edema at both ankles.", lsb:"Patient log-rolled onto the board. She cries out and says the board hurts her hip and back.",
+       pelvic_binder:"As the binder tightens over her hip, she screams in pain." },
+  ptHeader:"Elderly female", scene:"Ground-floor apartment. The neighbor lets you in. The patient is lying on her left side on the kitchen tile next to a bunched-up area rug.",
+  sceneSafe:"Scene is safe. The bunched area rug is a trip hazard; you move it aside.", numPts:"One patient.", moi:"Mechanism: ground-level fall from standing.", noi:"No medical complaint apparent from the doorway. Patient is on the floor after a fall.",
+  ccLt:"Chief complaint: right hip pain after a fall. No immediate life threats; no major bleeding.",
+  smr:"Elderly ground-level fall with possible head strike: consider SMR and decide after examining the neck.", bleed:"No major bleeding. Small skin tear on the right forearm with minor oozing.",
+  compute(m, F){
+    let hr = 96, sbp = 168, dbp = 92, rr = 20, pain = 8;
+    const imm = firstTx(F, ["hip_pad","vacuum","scoop"]);
+    if (imm !== null && m >= imm + 1) { pain = 6; hr = 90; rr = 18; sbp = 160; }
+    const bad = firstTx(F, ["traction","realign"]);
+    if (bad !== null && m >= bad && m < bad + 12) { pain = 10; hr = 118; sbp = 184; rr = 24; }
+    if (F.movedUnsplinted !== undefined && m >= F.movedUnsplinted && m < F.movedUnsplinted + 6) { pain = Math.max(pain, 10); hr = Math.max(hr, 112); }
+    const bl = firstTx(F, ["blanket","c_shock"]);
+    const temp = +(96.8 - (bl === null ? m : bl) * 0.03).toFixed(1);
+    const o2 = o2At(F, m);
+    const spo2 = o2 === "nc" ? 98 : o2 === "nrm" ? 99 : 96;
+    const realign = firstTx(F, "realign");
+    return { hr, sbp, dbp, rr, spo2, bgl:112, E:4, V:5, M:6, swallow:true, pain, temp, tempRoute:"tympanic",
+      skin: bl === null ? "pale, cool, dry" : "pale, warm, dry", pulseQ:"irregularly irregular, strong", pupils:"PERRL, 3 mm",
+      lungs:"Clear and equal bilaterally.", pmsBad: realign !== null && m >= realign };
+  },
+  present(S){
+    if (S.pain >= 10) return "Patient is crying out in pain, gripping the floor.";
+    return "81 y/o female lying on her left side on the kitchen floor, alert, grimacing, guarding her right hip. The right leg looks shorter than the left and the foot is turned outward.";
+  },
+  confused: () => false,
+  primary:{
+    gen_imp:"Elderly female in moderate distress from pain. Alert. Airway open. No obvious bleeding.",
+    airway:"Patent. No secretions or abnormal airway sounds. Speaking in full, complete sentences.", breathing:S => `RR ${S.rr}, unlabored.`, swallow:"Gag intact; swallows normally."
+  },
+  ask(id, S){
+    const p = {
+      ask_cc:"My right hip. I can't get up.", ask_id:"Margaret Ellison, last name E-L-L-I-S-O-N. June 2nd, 1945. About 58 kilograms.",
+      ask_o:"When I fell, about 40 minutes ago.", ask_p:"Any movement of my leg makes it much worse. Holding still helps a little.",
+      ask_q:"Sharp and deep.", ask_r:"Into my groin and the front of my thigh.", ask_s:`${S.pain} out of 10.`, ask_t:"Constant since I fell.",
+      ask_signs:"Just the hip, ever since I fell about 40 minutes ago. The back of my head is a little sore.", ask_allergies:"Sulfa. I get a rash.",
+      ask_meds:"Eliquis twice a day, metoprolol, amlodipine, and Fosamax once a week.", ask_pmh:"Atrial fibrillation, high blood pressure, and osteoporosis.",
+      ask_intake:"Toast and tea around 7.",
+      ask_events:"I was carrying my tea to the table, caught my foot on the rug, and went down sideways. I bumped the back of my head on the cabinet. I didn't feel dizzy or faint first. I just tripped.",
+      ask_loc:"No, I never blacked out. I remember the whole thing. I did bump my head on the cabinet.", ask_neckpain:"No, my neck and back feel fine.",
+      ask_anticoag:"Yes, Eliquis. I took it this morning.", ask_pde5:"No."
+    };
+    if (id === "ask_bystander") return [["Neighbor","I heard her calling through the wall, maybe 20 minutes ago. She's been awake and talking the whole time. She lives alone."]];
+    return PT(p[id] || "No.");
+  },
+  exam:{
+    ex_head:"2 cm hematoma, right occipital scalp. No active bleeding. No crepitus or step-off.",
+    ex_neck:"No midline cervical tenderness or step-off. Full range of motion without pain.",
+    ex_chest:"No tenderness; equal rise.", ex_abd:"Soft, non-tender.",
+    ex_pelvis:"Pelvis stable to gentle compression. Tender over the right lateral hip and groin.",
+    ex_back:"No midline tenderness. Sacral skin intact.",
+    ex_ue:"2 cm skin tear, right forearm; bleeding controlled. No deformity.",
+    ex_le:"Right leg shortened and externally rotated. Tender right hip and groin. No open wounds. Left leg normal.",
+    ex_pms:S => S.pmsBad ? "RIGHT foot pale and cool; pedal pulse weak; patient reports tingling in the toes. Left: pulse, motor, sensation intact." : "Pedal pulses present bilaterally. Sensation intact. Wiggles toes. Cap refill under 2 seconds.",
+    ex_stroke:"Negative: no facial droop, no arm drift, speech clear (gait not tested)."
+  },
+  onTreat(id){
+    if (id === "traction") return { text:"Traction splint applied. Patient screams; she says the pain is 10 out of 10.", alert:true };
+    if (id === "realign") return { text:"You attempt to straighten the right leg. Patient screams and grabs your arm.", alert:true };
+    if (id === "aspirin") return { text:"Patient chews the aspirin." };
+    return null;
+  },
+  onTransport(F, m){
+    if (firstTx(F, ["hip_pad","vacuum","scoop"]) === null) { F.movedUnsplinted = m; return { text:"As you lift her to the gurney without stabilizing the hip, she cries out. Pain 10/10.", alert:true }; }
+    return null;
+  },
+  events:[]
+}
+};
+
+/* =====================================================================
+   SIM STATE
+   ===================================================================== */
+let SIM = null;   // { sc, student, startedAt, t, contactT, phase, log[], F, feed[], fired{}, dest, priority, departT, etaT, attempt }
+let FORM = null;  // chart data
+let curGroup = "scene", curSect = "incident";
+
+function sc(){ return SCEN[SIM.sc]; }
+function mNow(){ return SIM.contactT === null ? 0 : (SIM.t - SIM.contactT) / 60; }
+function stateAt(m){ return sc().compute(m, SIM.F); }
+function S(){ return stateAt(mNow()); }
+
+function newSim(id, student){
+  const s = SCEN[id];
+  const attempts = (lsGet(`attempts.${student.id}.${id}`) || 0) + 1; lsSet(`attempts.${student.id}.${id}`, attempts);
+  SIM = { v:VERSION, sc:id, student, startedAt:new Date().toISOString(), t:toSec(s.cad.onscene), contactT:null, phase:"scene",
+          log:[], F:{ tx:[] }, feed:[], fired:{}, dest:null, priority:null, departT:null, etaT:null, attempt:attempts,
+          seed:Math.random().toString(36).slice(2) };
+  FORM = blankForm();
+  fillCAD();
+  addFeed(SIM.t, "sys", null, `On scene. ${s.scene}`);
+  save();
+}
+function blankForm(){ return { f:{}, vitals:[], tx:[] }; }
+function saveKey(studentId, scId){ return `save.${studentId}.${scId}`; }
+function save(){ if (SIM) lsSet(saveKey(SIM.student.id, SIM.sc), { SIM, FORM }); }
+/* Fields a real ePCR pulls from CAD: filled in and locked */
+const CAD_FIELDS = ["unit","t_psap","t_disp"];
+function fillCAD(){ const s = SCEN[SIM.sc]; FORM.f.unit = s.unit.replace(/\s*\(.*\)/,""); FORM.f.t_psap = s.cad.psap; FORM.f.t_disp = s.cad.disp; }
+/* "01012001" or "1/1/2001" -> "01/01/2001" */
+function fmtDOB(v){
+  const raw = String(v||"").trim(); if (!raw) return { v:"", ok:true };
+  let mm, dd, yy;
+  const parts = raw.split(/[\/\-. ]+/);
+  if (parts.length === 3) [mm, dd, yy] = parts;
+  else { const d = raw.replace(/\D/g,""); if (d.length !== 8) return { v:raw, ok:false }; mm = d.slice(0,2); dd = d.slice(2,4); yy = d.slice(4); }
+  const M = +mm, D = +dd, Y = +yy;
+  if (!(M >= 1 && M <= 12 && D >= 1 && D <= 31 && String(yy).length === 4 && Y >= 1900 && Y <= 2026)) return { v:raw, ok:false };
+  return { v:`${String(M).padStart(2,"0")}/${String(D).padStart(2,"0")}/${Y}`, ok:true };
+}
+/* "1350" -> "13:50:00", "135012" -> "13:50:12", "950" -> "09:50:00", "13:5" stays as typed */
+function fmtTime(v, withSec){
+  const raw = String(v||"").trim(); if (!raw) return { v:"", ok:true };
+  if (raw.includes(":") && !/^\d{1,2}:\d{2}(:\d{2})?$/.test(raw)) return { v:raw, ok:false };
+  let d = raw.replace(/\D/g,"");
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(raw)) d = raw.split(":").map((x,i)=>i===0?x.padStart(2,"0"):x).join("");
+  if (d.length === 3 || d.length === 5) d = "0" + d;
+  if (d.length !== 4 && d.length !== 6) return { v:raw, ok:false };
+  const h = +d.slice(0,2), m = +d.slice(2,4), x = d.length === 6 ? +d.slice(4,6) : 0;
+  if (h > 23 || m > 59 || x > 59) return { v:raw, ok:false };
+  const p = n => String(n).padStart(2,"0");
+  return { v: withSec || d.length === 6 ? `${p(h)}:${p(m)}:${p(x)}` : `${p(h)}:${p(m)}`, ok:true };
+}
+
+function addFeed(t, kind, label, html, alert){ SIM.feed.push({ t, kind, label, html, alert:!!alert }); }
+
+/* snapshot stored with each action for the instructor's review */
+function snap(st){ return [st.hr, st.sbp, st.dbp, st.rr, st.spo2, st.bgl, st.E+st.V+st.M, st.swallow?1:0, st.pain]; }
+
+function vitalsText(st){
+  const o2 = o2At(SIM.F, mNow());
+  const o2t = o2 === "nc" ? " on 4 L NC" : o2 === "nrm" ? " on 15 L NRB" : " room air";
+  return `BP <b>${st.sbp}/${st.dbp}</b> · P <b>${st.hr}</b> ${st.pulseQ} · R <b>${st.rr}</b> · SpO₂ <b>${st.spo2}%</b>${o2t} · Skin ${st.skin}`;
+}
+function avpuText(st){
+  const g = st.E+st.V+st.M;
+  if (g === 15) return "Alert. Oriented to person, place, time, and event.";
+  if (st.V === 4 && st.E === 4) return "Alert but confused. Oriented to person only.";
+  if (st.E === 4) return "Alert; inappropriate words.";
+  if (st.E === 3) return "Responds to verbal stimuli; eyes open to loud voice.";
+  return "Responds to painful stimuli only.";
+}
+
+/* the "last obtained" vitals panel only shows what the student has measured */
+function lastObtained(){
+  const o = {};
+  for (const L of SIM.log){
+    if (!L.s) continue;
+    if (L.a === "v_set") { o.bp = [`${L.s[1]}/${L.s[2]}`, L.t]; o.hr = [L.s[0], L.t]; o.rr = [L.s[3], L.t]; o.spo2 = [L.s[4]+"%", L.t]; }
+    if (L.a === "v_bgl") o.bgl = [L.s[5], L.t];
+    if (L.a === "gcs") o.gcs = [L.s[6], L.t];
+    if (L.a === "v_pain" && L.x) o.pain = [L.x, L.t];
+    if (L.a === "v_temp") o.temp = [L.x, L.t];
+  }
+  return o;
+}
+
+/* Button order is shuffled once per attempt (fixed for the rest of that call) so the list isn't a checklist. */
+function seededRand(str){ let h = 1779033703 ^ str.length; for (let i=0;i<str.length;i++){ h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = h << 13 | h >>> 19; }
+  return () => { h = Math.imul(h ^ h >>> 16, 2246822507); h = Math.imul(h ^ h >>> 13, 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; }; }
+function orderFor(g){
+  if (!SIM.seed) SIM.seed = Math.random().toString(36).slice(2);
+  SIM.order = SIM.order || {};
+  const ids = ACTIONS.filter(a => a[0] === g).map(a => a[1]);
+  const cached = SIM.order[g];
+  if (cached && cached.length === ids.length && cached.every(id => ACT[id])) return cached;
+  if (g === "transport") return SIM.order[g] = ids;
+  const r = seededRand(SIM.seed + g), out = ids.slice();
+  for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+  return SIM.order[g] = out;
+}
+
+/* =====================================================================
+   ACTIONS
+   ===================================================================== */
+function allowed(a){
+  const ph = SIM.phase;
+  if (ph === "done") return false;
+  if (a.id === "begin_transport") return ph === "care";
+  if (a.id === "arrive") return ph === "transport";
+  if (a.id === "transfer") return ph === "arrived";
+  if (a.rule === "pre") return ph === "scene";
+  if (a.rule === "any") return true;
+  return ph !== "scene";
+}
+
+function doAction(id, param){
+  const a = ACT[id]; if (!a || !allowed(a)) return;
+  if (id === "begin_transport" && !param) return transportModal();
+  const s = sc(), t0 = SIM.t, m0 = mNow(), st = S();
+  const entry = { t:t0, a:id };
+  let lines = [], alert = false;
+
+  const dxr = (s.dx && s.dx[id]) || (a.group !== "treat" ? DX[id] : null);
+  if (dxr && a.group !== "treat") {
+    if (id === "cap_refill") lines.push(["", /cool|cold/.test(st.skin) ? "Capillary refill about 3 seconds." : "Capillary refill under 2 seconds."]);
+    else if (Array.isArray(dxr)) lines = (s.confused(st) && dxr[0][0] === "Patient") ? [["Patient","(does not answer appropriately)"]] : dxr;
+    else lines.push(["", dxr]);
+    entry.s = snap(st);
+  } else if (id === "contact") {
+    SIM.contactT = t0 + a.cost; SIM.phase = "care";
+    entry.t = SIM.contactT;
+    lines.push(["", "Patient contact made."]);
+  } else if (a.group === "scene") {
+    const r = { ppe:"Gloves and eye protection on.", scene_safe:s.sceneSafe, num_pts:s.numPts, moi:s.moi, noi:s.noi,
+                no_resources:"No additional resources requested.", smr_consider:s.smr, smr_no:"Spinal immobilization not needed at this time. Decision noted.",
+                req_als:"Dispatch: \"Copy, M-62. Nearest ALS unit is committed on another call; ETA 13+ minutes. Continue BLS until ALS unit arrives.\"" }[id];
+    lines.push(["", r]);
+  } else if (a.group === "primary") {
+    const P = s.primary;
+    let r;
+    if (id === "avpu") r = avpuText(st);
+    else if (id === "gcs") r = `GCS ${st.E+st.V+st.M} (E${st.E} V${st.V} M${st.M}).`;
+    else if (id === "cc_lt") r = s.ccLt;
+    else if (id === "c_pulse") r = `Radial pulse ${st.hr}, ${st.pulseQ}.`;
+    else if (id === "c_skin") r = `Skin ${st.skin}.`;
+    else if (id === "c_bleed") r = s.bleed || "No major bleeding.";
+    else if (id === "c_shock") { SIM.F.tx.push({ id, m:m0 }); r = "Shock management: patient positioned for perfusion and comfort, covered to conserve body heat, oxygen per protocol."; }
+    else if (id === "prio_high" || id === "prio_low") { SIM.prio = id === "prio_high" ? "3" : "2"; r = `Transport priority set: ${id === "prio_high" ? "priority (Code 3)" : "non-priority (Code 2)"}.`; }
+    else if (id === "lungs") r = st.lungs;
+    else { r = P[id]; if (typeof r === "function") r = r(st); }
+    lines.push(["", r || "No abnormality found."]);
+    entry.s = snap(st);
+  } else if (a.group === "history") {
+    lines = s.ask(id, st);
+    entry.s = snap(st);
+  } else if (a.group === "exam") {
+    let r = s.exam[id];
+    if (id === "ex_pupils") r = st.pupils;
+    if (typeof r === "function") r = r(st);
+    lines.push(["", r || "No abnormality found."]);
+  } else if (a.group === "vitals") {
+    entry.s = snap(st);
+    if (id === "v_set") lines.push(["", vitalsText(st)]);
+    if (id === "v_bgl") lines.push(["", `Blood glucose <b>${st.bgl} mg/dL</b>.`]);
+    if (id === "v_temp") { entry.x = `${st.temp} °F`; lines.push(["", `Temperature <b>${st.temp} °F</b> (${st.tempRoute}).`]); }
+    if (id === "v_pain") { if (s.confused(st)) lines = [["Patient","(unable to rate)"]]; else { entry.x = `${st.pain}/10`; lines = [["Patient", `"${st.pain} out of 10."`]]; } }
+  } else if (a.group === "treat") {
+    const hook = s.onTreat && s.onTreat(id, st, SIM.F, m0);
+    const rec = { id, m:m0 };
+    if (id === "oral_glucose") rec.eff = hook ? !!hook.eff : st.swallow;
+    SIM.F.tx.push(rec);
+    entry.s = snap(st);
+    if (hook) { lines.push(["", hook.text]); alert = !!hook.alert; }
+    else if (s.dx && s.dx[id]) { lines.push(["", s.dx[id]]); alert = true; }
+    else lines.push(["", TX_RESP[id] || (TX_LABEL[id] + " given.")]);
+  } else if (id === "begin_transport") {
+    entry.p = param;
+    SIM.dest = param.dest; SIM.priority = param.pr;
+    const hook = s.onTransport && s.onTransport(SIM.F, m0);
+    if (hook) { addFeed(t0, "act", a.label, esc(hook.text), true); }
+    SIM.departT = t0 + a.cost; SIM.etaT = SIM.departT + HOSP[param.dest].min*60;
+    SIM.phase = "transport";
+    lines.push(["", `Patient packaged and loaded. Departing to <b>${esc(HOSP[param.dest].name)}</b>, ${param.pr === "3" ? "emergent (Code 3)" : "non-emergent (Code 2)"}.`]);
+    SIM.log.push(entry);
+    SIM.t = SIM.departT;
+    SIM.log.push({ t:SIM.departT, a:"depart" });
+    addFeed(t0, "act", a.label, lines.map(l=>l[1]).join(" "));
+    addFeed(SIM.departT, "sys", null, "Depart scene.");
+    afterAdvance(); render(); save(); return;
+  } else if (id === "arrive") {
+    SIM.t = Math.max(SIM.t, SIM.etaT);
+    entry.t = SIM.t; SIM.phase = "arrived";
+    lines.push(["", `Arrived at ${esc(HOSP[SIM.dest].name)}. Triage nurse: <b>${esc(s.triageRN)}</b>.`]);
+  } else if (id === "transfer") {
+    lines.push(["", `Verbal report given and care transferred to ${esc(s.triageRN)}. Patient moved to ED bed.`]);
+    SIM.log.push(entry);
+    addFeed(t0, "act", a.label, lines.map(l=>l[1]).join(" "));
+    SIM.t = t0 + a.cost; SIM.phase = "done";
+    addFeed(SIM.t, "sys", null, "Call complete. Unit back in service. Finish your chart on the right, then go to Finalize.");
+    render(); save(); return;
+  }
+
+  SIM.log.push(entry);
+  const text = lines.map(([who, t]) => who ? `<span class="spk">${esc(who)}:</span> ${who === "" ? t : esc(t)}` : t).join("<br>");
+  addFeed(entry.t, "act", a.label, text, alert);
+  if (id !== "contact" && id !== "arrive") SIM.t = t0 + a.cost;
+  else if (id === "contact") SIM.t = SIM.contactT;
+  afterAdvance();
+  render(); save();
+}
+
+function afterAdvance(){
+  if (SIM.contactT === null) return;
+  const s = sc(), m = mNow(), st = S();
+  for (const ev of s.events || []) {
+    if (SIM.fired[ev.id]) continue;
+    if (ev.when(m, st, SIM.F)) { SIM.fired[ev.id] = SIM.t; addFeed(SIM.t, "sys", null, esc(ev.text), ev.alert); SIM.log.push({ t:SIM.t, a:"ev_"+ev.id }); }
+  }
+}
+
+/* =====================================================================
+   RENDER — left pane
+   ===================================================================== */
+function renderDispatch(){
+  const s = sc();
+  $("#dispatch").innerHTML = `
+    <summary><span class="chev">▸</span> Dispatch · <span class="mono">${esc(s.incident)}</span> · ${esc(s.nature)} <span class="mono" style="margin-left:auto;font-weight:400;color:var(--ink-3)">Code ${s.code}</span></summary>
+    <dl class="dgrid">
+      <dt>Unit</dt><dd>${esc(s.unit)}</dd>
+      <dt>Address</dt><dd>${esc(s.address)}</dd>
+      <dt>Caller</dt><dd>${esc(s.caller)}</dd>
+      <dt>Notes</dt><dd>${esc(s.notes)}</dd>
+    </dl>
+    <div class="cad mono">
+      <div><b>Call rcvd</b>${s.cad.psap}</div><div><b>Dispatched</b>${s.cad.disp}</div>
+      <div><b>En route</b>${s.cad.enroute}</div><div><b>On scene</b>${s.cad.onscene}</div>
+    </div>`;
+}
+const PHASE_LBL = { scene:"On scene", care:"Patient care", transport:"Transporting", arrived:"At destination", done:"Call complete" };
+function renderLeft(){
+  const s = sc();
+  $("#clock").textContent = hms(SIM.t);
+  const ph = $("#phase"); ph.textContent = PHASE_LBL[SIM.phase]; ph.className = "phase " + SIM.phase;
+  $("#elapsed").innerHTML = SIM.contactT === null ? "Before patient contact" :
+    `Contact ${hm(SIM.contactT)} · +${Math.floor((SIM.t - SIM.contactT)/60)} min` + (SIM.phase === "transport" ? `<br>ETA ${hm(SIM.etaT)}` : "");
+  // presentation
+  let pres;
+  if (SIM.phase === "scene") pres = `<span class="who">Scene:</span> ${esc(s.scene)}`;
+  else if (SIM.phase === "done") pres = `<span class="who">Call complete.</span> Care transferred at destination. Finish documentation.`;
+  else pres = `<span class="who">Patient:</span> ${esc(s.present(S()))}`;
+  $("#present").innerHTML = pres;
+  // vitals
+  const o = lastObtained();
+  const chip = (k, lbl) => `<div class="vchip"><b>${lbl}</b><span>${o[k] ? esc(o[k][0]) : "—"}</span><i>${o[k] ? hm(o[k][1]) : "&nbsp;"}</i></div>`;
+  $("#vchips").innerHTML = chip("bp","BP") + chip("hr","Pulse") + chip("rr","Resp") + chip("spo2","SpO₂") + chip("bgl","BGL") + chip("gcs","GCS") + chip("pain","Pain");
+  // tabs
+  $("#atabs").innerHTML = GROUPS.map(([g,l]) => `<button class="atab ${g===curGroup?"on":""}" role="tab" aria-selected="${g===curGroup}" data-g="${g}">${l}</button>`).join("");
+  const used = new Set(SIM.log.map(l => l.a));
+  $("#agrid").innerHTML = orderFor(curGroup).map(id => {
+    const A = ACT[id], ok = allowed(A);
+    return `<button class="act ${used.has(A.id)?"done-once":""}" data-a="${A.id}" ${ok?"":"disabled"}><span>${esc(A.label)}</span><span class="cost">${A.cost ? (A.cost>=60 ? (A.cost/60)+" min" : A.cost+" s") : ""}</span></button>`;
+  }).join("");
+  // feed
+  const feed = $("#feed");
+  feed.innerHTML = SIM.feed.map(e => `<div class="ev ${e.kind==="sys"?"sys":""} ${e.alert?"alert":""}"><div class="tm">${hms(e.t)}</div><div>${e.label?`<span class="act-l">${esc(e.label)}</span> — `:""}${e.html}</div></div>`).join("");
+  feed.scrollTop = feed.scrollHeight;
+}
+
+/* =====================================================================
+   ePCR — right pane
+   ===================================================================== */
+const IMPRESSIONS = ["","Abdominal pain","Allergic reaction","Altered mental status","Behavioral/psychiatric","Cardiac arrest","Chest pain – suspected cardiac","Chest pain – non-cardiac","Diabetic – hypoglycemia","Diabetic – hyperglycemia","Fall","General weakness","Head injury","Hip injury – suspected fracture","Hypotension","Overdose/poisoning","Respiratory distress","Seizure","Stroke/CVA","Syncope","Trauma – extremity","Other"];
+const PMH = ["Diabetes","Hypertension","Cardiac / MI","Stent / CABG","CHF","Atrial fibrillation","Hyperlipidemia","COPD / asthma","Stroke / TIA","Seizure disorder","Osteoporosis","Renal disease"];
+const EXAM = [["head","Head / face"],["neck","Neck / C-spine"],["chest","Chest"],["abd","Abdomen"],["pelvis","Pelvis"],["back","Back"],["ue","Upper extremities"],["le","Lower extremities"],["pms","Distal PMS"],["neuro","Neuro / stroke screen"]];
+const SECTS = [
+  ["incident","Incident & times"],["patient","Patient"],["history","Complaint & history"],["assess","Assessment"],
+  ["vitals","Vitals"],["tx","Treatments"],["narr","Narrative"],["disp","Disposition"],["final","Finalize"]
+];
+const REQ = {
+  incident:["inc_num","resp_mode","t_psap","t_disp","t_enroute","t_onscene","t_contact","t_depart","t_atdest","t_transfer"],
+  patient:["pt_last","pt_first","pt_dob","pt_age","pt_sex"],
+  history:["cc","imp_primary","meds","allergies"],
+  assess:["a_avpu","a_gcs_e","a_gcs_v","a_gcs_m","a_airway","a_breathing","a_skin_color"],
+  vitals:[], tx:[], narr:["narrative"],
+  disp:["disp","dest","dest_reason","priority","cond","transfer_to","crew_sig","attest"]
+};
+const FLABEL = { inc_num:"Incident number", resp_mode:"Response mode", t_psap:"Call received time", t_disp:"Dispatched time", t_enroute:"En route time", t_onscene:"On scene time",
+  t_contact:"Patient contact time", t_depart:"Depart scene time", t_atdest:"At destination time", t_transfer:"Transfer of care time",
+  pt_last:"Patient last name", pt_first:"Patient first name", pt_dob:"Date of birth", pt_age:"Age", pt_sex:"Sex", cc:"Chief complaint", imp_primary:"Primary impression",
+  meds:"Medications", allergies:"Allergies", a_avpu:"Initial LOC (AVPU)", a_gcs_e:"GCS eyes", a_gcs_v:"GCS verbal", a_gcs_m:"GCS motor", a_airway:"Airway", a_breathing:"Breathing",
+  a_skin_color:"Skin color", narrative:"Narrative", disp:"Disposition", dest:"Destination", dest_reason:"Destination reason", priority:"Transport priority",
+  cond:"Condition at destination", transfer_to:"Care transferred to", crew_sig:"Crew signature", attest:"Attestation" };
+
+const fv = k => FORM.f[k] ?? "";
+function inp(k, opts = {}){
+  const v = fv(k), req = opts.req ? "req" : "";
+  const lbl = opts.label ? `<label class="lbl ${req}" for="f_${k}">${esc(opts.label)}</label>` : "";
+  if (opts.type === "select") return `${lbl}<select class="inp" id="f_${k}" data-k="${k}">${opts.options.map(o => { const [val,l] = Array.isArray(o)?o:[o,o]; return `<option value="${esc(val)}" ${val===v?"selected":""}>${esc(l||"—")}</option>`; }).join("")}</select>`;
+  if (opts.type === "textarea") return `${lbl}<textarea class="inp" id="f_${k}" data-k="${k}" rows="${opts.rows||3}" placeholder="${esc(opts.ph||"")}">${esc(v)}</textarea>`;
+  const ro = CAD_FIELDS.includes(k);
+  return `${lbl}<input class="inp ${opts.mono?"mono":""} ${ro?"ro":""}" id="f_${k}" data-k="${k}" value="${esc(v)}" placeholder="${esc(opts.ph||"")}" ${ro?'readonly title="Auto-filled from CAD"':""} ${opts.w?`style="max-width:${opts.w}"`:""}>`;
+}
+const TIME_PH = "HH:MM:SS";
+const box = (inner, cls="") => `<div class="${cls}">${inner}</div>`;
+
+function sectHTML(id){
+  const s = sc();
+  switch(id){
+  case "incident": return `
+    <h2>Incident & times</h2><p class="hint">Unit, call received, and dispatched times come from CAD automatically. Enter the rest from the dispatch panel and your call log. Type times as 1350 or 135012; they format as 13:50:00.</p>
+    <div class="g g3">
+      ${box(inp("inc_num",{label:"Incident number",req:1,mono:1}))}
+      ${box(inp("unit",{label:"Unit · CAD"}))}
+      ${box(inp("resp_mode",{label:"Response mode",req:1,type:"select",options:["","Code 2 (non-emergent)","Code 3 (emergent)"]}))}
+    </div>
+    <div class="g g2">${box(inp("crew",{label:"Crew members"}))}${box(inp("inc_addr",{label:"Incident location"}))}</div>
+    <fieldset><legend>Times</legend><div class="g g4">
+      ${[["t_psap","Call rcvd"],["t_disp","Dispatched"],["t_enroute","En route"],["t_onscene","On scene"],["t_contact","Patient contact"],["t_depart","Depart scene"],["t_atdest","At destination"],["t_transfer","Transfer of care"]]
+        .map(([k,l]) => box(inp(k,{label:CAD_FIELDS.includes(k) ? l + " · CAD" : l,req:!CAD_FIELDS.includes(k),mono:1,ph:TIME_PH}))).join("")}
+    </div></fieldset>`;
+  case "patient": return `
+    <h2>Patient</h2><p class="hint">Enter only what you obtained on the call.</p>
+    <div class="g g2">${box(inp("pt_last",{label:"Last name",req:1}))}${box(inp("pt_first",{label:"First name",req:1}))}</div>
+    <div class="g g4">
+      ${box(inp("pt_dob",{label:"Date of birth",req:1,ph:"MM/DD/YYYY",mono:1}))}
+      ${box(inp("pt_age",{label:"Age (years)",req:1,mono:1}))}
+      ${box(inp("pt_sex",{label:"Sex",req:1,type:"select",options:["","Female","Male","Unknown"]}))}
+      ${box(inp("pt_wt",{label:"Weight (kg)",mono:1}))}
+    </div>
+    <div class="g g2">${box(inp("pt_wt_src",{label:"Weight source",type:"select",options:["","Patient stated","Family stated","Estimated","Measured"]}))}</div>`;
+  case "history": {
+    const pm = new Set((fv("pmh")||"").split("|").filter(Boolean));
+    return `
+    <h2>Complaint & history</h2><p class="hint">Record what the patient or family actually told you.</p>
+    <div class="g g2">${box(inp("cc",{label:"Chief complaint",req:1}))}${box(inp("cc_dur",{label:"Duration"}))}</div>
+    <div class="g g2">
+      ${box(inp("imp_primary",{label:"Primary impression",req:1,type:"select",options:IMPRESSIONS}))}
+      ${box(inp("imp_secondary",{label:"Secondary impression",type:"select",options:IMPRESSIONS}))}
+    </div>
+    <fieldset><legend>OPQRST</legend><div class="g g3">
+      ${[["o","Onset"],["p","Provocation / palliation"],["q","Quality"],["r","Region / radiation"],["s","Severity (0–10)"],["t","Time"]].map(([k,l]) => { const u = !!fv(`opq_${k}_uto`);
+        return box(`<label class="lbl" for="f_opq_${k}">${l}</label><input class="inp" id="f_opq_${k}" data-k="opq_${k}" value="${esc(u ? "" : fv("opq_"+k))}" ${u ? 'disabled placeholder="Unable to obtain"' : ""}>
+          <label class="uto"><input type="checkbox" data-uto="${k}" ${u ? "checked" : ""}> Unknown / unable to obtain</label>`); }).join("")}
+    </div></fieldset>
+    <fieldset><legend>Past medical history</legend>
+      <div class="checks">${PMH.map(p=>`<label><input type="checkbox" data-pmh="${esc(p)}" ${pm.has(p)?"checked":""}> ${esc(p)}</label>`).join("")}</div>
+      <div class="g g2" style="margin:8px 0 0">${box(inp("pmh_other",{label:"Other history"}))}${box(inp("pmh_none",{label:"No history / unknown",type:"select",options:["","None reported","Unknown"]}))}</div>
+    </fieldset>
+    <div class="g g2">
+      ${box(inp("meds",{label:"Medications",req:1,type:"textarea",rows:3,ph:"Name, dose if known. Write 'None' if none."}))}
+      ${box(inp("allergies",{label:"Allergies (and reaction)",req:1,type:"textarea",rows:3,ph:"Write 'NKDA' if none."}))}
+    </div>
+    <div class="g g2">${box(inp("last_intake",{label:"Last oral intake"}))}${box(inp("events",{label:"Events leading up"}))}</div>`;
+  }
+  case "assess": return `
+    <h2>Assessment</h2><p class="hint">Initial findings. For each exam region, choose “Not assessed” if you didn't examine it.</p>
+    <div class="g g4">
+      ${box(inp("a_avpu",{label:"Initial LOC",req:1,type:"select",options:["","Alert","Verbal","Pain","Unresponsive"]}))}
+      ${box(inp("a_gcs_e",{label:"GCS eyes",req:1,type:"select",options:["","4","3","2","1"]}))}
+      ${box(inp("a_gcs_v",{label:"GCS verbal",req:1,type:"select",options:["","5","4","3","2","1"]}))}
+      ${box(inp("a_gcs_m",{label:"GCS motor",req:1,type:"select",options:["","6","5","4","3","2","1"]}))}
+    </div>
+    <div class="g g3">
+      ${box(inp("a_orient",{label:"Orientation",type:"select",options:["","A&O ×4","A&O ×3","A&O ×2","A&O ×1","Disoriented","Unable to assess"]}))}
+      ${box(inp("a_airway",{label:"Airway",req:1,type:"select",options:["","Patent","Patent – at risk","Partially obstructed","Obstructed"]}))}
+      ${box(inp("a_breathing",{label:"Breathing",req:1,type:"select",options:["","Normal / unlabored","Labored","Shallow","Absent"]}))}
+    </div>
+    <div class="g g4">
+      ${box(inp("a_lungs",{label:"Lung sounds",type:"select",options:["","Clear bilaterally","Wheezes","Crackles","Diminished","Absent","Not assessed"]}))}
+      ${box(inp("a_skin_color",{label:"Skin color",req:1,type:"select",options:["","Normal / pink","Pale","Gray / ashen","Flushed","Cyanotic","Mottled"]}))}
+      ${box(inp("a_skin_temp",{label:"Skin temp",type:"select",options:["","Warm","Cool","Cold","Hot"]}))}
+      ${box(inp("a_skin_moist",{label:"Skin moisture",type:"select",options:["","Dry","Moist","Diaphoretic"]}))}
+    </div>
+    <div class="g g2">${box(inp("a_pulse",{label:"Pulse quality / rhythm",ph:"e.g. regular, strong"}))}${box(inp("a_pupils",{label:"Pupils"}))}</div>
+    <fieldset><legend>Physical exam</legend>
+      ${EXAM.map(([k,l]) => `<div class="exam-row"><div class="nm">${l}</div>
+        <select class="inp" id="f_ex_${k}" data-k="ex_${k}">${["Not assessed","No abnormality","Abnormal"].map(o=>`<option ${o===(fv("ex_"+k)||"Not assessed")?"selected":""}>${o}</option>`).join("")}</select>
+        <input class="inp" id="f_exn_${k}" data-k="exn_${k}" value="${esc(fv("exn_"+k))}" placeholder="Findings"></div>`).join("")}
+    </fieldset>`;
+  case "vitals": return `
+    <h2>Vital signs</h2><p class="hint">One row per set you actually obtained, with the time it was taken. Leave a cell blank if you didn't measure it.</p>
+    <div class="tbl-wrap"><table class="grid"><thead><tr><th>Time</th><th>BP</th><th>Pulse</th><th>Resp</th><th>SpO₂ %</th><th>BGL</th><th>GCS</th><th>Pain</th><th>O₂</th><th></th></tr></thead>
+    <tbody>${FORM.vitals.map((r,i)=>`<tr>
+      ${["time","bp","hr","rr","spo2","bgl","gcs","pain"].map(c=>`<td><input class="inp mono" data-vr="${i}" data-c="${c}" value="${esc(r[c]||"")}" placeholder="${c==="time"?"HH:MM":c==="bp"?"120/80":""}" style="min-width:${c==="time"?"74px":c==="bp"?"70px":"44px"}"></td>`).join("")}
+      <td><select class="inp" data-vr="${i}" data-c="o2">${["RA","NC","NRB","BVM"].map(o=>`<option ${o===(r.o2||"RA")?"selected":""}>${o}</option>`).join("")}</select></td>
+      <td><button class="xbtn" data-delv="${i}" title="Remove row" aria-label="Remove row">×</button></td></tr>`).join("") || `<tr><td colspan="10" style="color:var(--ink-3);padding:10px">No vitals charted yet.</td></tr>`}
+    </tbody></table></div>
+    <div class="rowbtns" style="margin-top:8px"><button class="btn" id="addV">+ Add vital signs</button></div>`;
+  case "tx": return `
+    <h2>Treatments & procedures</h2><p class="hint">Each intervention and medication you performed, with time, dose, route, and the patient's response.</p>
+    <div class="tbl-wrap"><table class="grid"><thead><tr><th>Time</th><th>Treatment</th><th>Dose</th><th>Route</th><th>Response</th><th></th></tr></thead>
+    <tbody>${FORM.tx.map((r,i)=>`<tr>
+      <td><input class="inp mono" data-tr="${i}" data-c="time" value="${esc(r.time||"")}" placeholder="HH:MM" style="min-width:74px"></td>
+      <td><select class="inp" data-tr="${i}" data-c="tx"><option value="">—</option>${TX_IDS.map(t=>`<option value="${t}" ${t===r.tx?"selected":""}>${esc(TX_LABEL[t])}</option>`).join("")}</select></td>
+      <td><input class="inp" data-tr="${i}" data-c="dose" value="${esc(r.dose||"")}" placeholder="e.g. 324 mg" style="min-width:80px"></td>
+      <td><select class="inp" data-tr="${i}" data-c="route">${["","PO","SL","IN","IM","Buccal","Inhaled","NC","NRB","N/A"].map(o=>`<option ${o===(r.route||"")?"selected":""}>${o}</option>`).join("")}</select></td>
+      <td><select class="inp" data-tr="${i}" data-c="resp">${["","Improved","Unchanged","Worse","N/A"].map(o=>`<option ${o===(r.resp||"")?"selected":""}>${o}</option>`).join("")}</select></td>
+      <td><button class="xbtn" data-delt="${i}" title="Remove row" aria-label="Remove row">×</button></td></tr>`).join("") || `<tr><td colspan="6" style="color:var(--ink-3);padding:10px">No treatments charted yet.</td></tr>`}
+    </tbody></table></div>
+    <div class="rowbtns" style="margin-top:8px"><button class="btn" id="addT">+ Add treatment</button></div>`;
+  case "narr": return `
+    <h2>Narrative</h2>
+    <p class="hint">Write it as if it will be read aloud in a deposition. Chronological, objective, specific. Include what you found, what you did, how the patient responded, and who you handed off to.</p>
+    ${inp("narrative",{type:"textarea",rows:16})}<div class="wc" id="wc"></div>`;
+  case "disp": return `
+    <h2>Disposition</h2>
+    <div class="g g2">
+      ${box(inp("disp",{label:"Disposition",req:1,type:"select",options:["","Treated, transported by this unit","Treated, transferred to ALS","Patient refused care (AMA)","Treated and released","No patient found"]}))}
+      ${box(inp("dest",{label:"Destination",req:1,type:"select",options:[["",""],...Object.entries(HOSP).map(([k,h])=>[k,h.name])]}))}
+    </div>
+    <div class="g g3">
+      ${box(inp("dest_reason",{label:"Destination reason",req:1,type:"select",options:["","Closest appropriate facility","Specialty center – stroke/cardiac","Specialty center – trauma","Specialty center – pediatric","Specialty center – spinal","Patient / family choice","Per protocol / base order"]}))}
+      ${box(inp("priority",{label:"Transport priority",req:1,type:"select",options:["","Non-emergent (Code 2)","Emergent (Code 3)"]}))}
+      ${box(inp("t_pos",{label:"Position during transport",type:"select",options:["","Semi-Fowler's / position of comfort","Supine","Recovery / lateral","Fowler's","Spinal motion restriction"]}))}
+    </div>
+    <div class="g g2">
+      ${box(inp("cond",{label:"Condition at destination",req:1,type:"select",options:["","Improved","Unchanged","Worse"]}))}
+      ${box(inp("transfer_to",{label:"Care transferred to (name, credential)",req:1}))}
+    </div>
+    <fieldset><legend>Signature</legend>
+      <div class="g g2">${box(inp("crew_sig",{label:"Primary EMT (typed signature)",req:1}))}${box(inp("cert_num",{label:"EMT certification #"}))}</div>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px"><input type="checkbox" id="f_attest" ${fv("attest")?"checked":""}> <span>I attest that this report is a true and accurate record of the care I provided.</span></label>
+    </fieldset>`;
+  case "final": return finalHTML();
+  }
+}
+
+function missingFor(sec){
+  const miss = [];
+  for (const k of REQ[sec] || []) if (!String(fv(k)).trim()) miss.push(k);
+  if (sec === "vitals" && FORM.vitals.length === 0) miss.push("vitals");
+  if (sec === "tx" && false) miss.push("tx");
+  return miss;
+}
+function renderNav(){
+  $("#snav").innerHTML = SECTS.map(([k,l]) => {
+    const miss = k === "final" ? null : missingFor(k).length;
+    const dot = k === "final" ? "" : `<span class="dot ${miss?"miss":"ok"}"></span>`;
+    return `<button class="${k===curSect?"on":""}" data-sect="${k}">${l}${dot}</button>`;
+  }).join("");
+}
+function renderPcrHead(){
+  const name = [fv("pt_last"), fv("pt_first")].filter(Boolean).join(", ") || "Patient (unknown)";
+  $("#pcrhead").innerHTML = `<span><span class="k">PCR</span><b class="mono">${esc(fv("inc_num")||"—")}</b></span><span><span class="k">Pt</span><b>${esc(name)}</b></span>
+    <span><span class="k">Age/Sex</span><b>${esc(fv("pt_age")||"—")} ${esc((fv("pt_sex")||"").charAt(0))}</b></span><span><span class="k">CC</span><b>${esc(fv("cc")||"—")}</b></span>`;
+}
+function renderRight(){
+  $("#sect").innerHTML = sectHTML(curSect);
+  renderNav(); renderPcrHead();
+  if (curSect === "narr") updWC();
+}
+function updWC(){ const n = (fv("narrative").trim().match(/\S+/g)||[]).length; const w = $("#wc"); if (w) w.textContent = `${n} words`; }
+function render(){ renderLeft(); renderRight(); $("#whoLbl").textContent = `${SIM.student.name} · ${SIM.student.id}`; }
+
+/* ---------- finalize ---------- */
+function allMissing(){ const out = []; for (const [k] of SECTS) for (const f of missingFor(k)) out.push([k, f]); return out; }
+function finalHTML(){
+  const miss = allMissing();
+  const done = SIM.phase === "done";
+  return `
+    <h2>Finalize</h2><p class="hint">Fix every required item, then generate your PCR and save it as a PDF.</p>
+    ${done ? "" : `<div class="note">The call isn't over yet. Transport the patient and transfer care before you finalize.</div>`}
+    <ul class="valist">${miss.length ? miss.map(([s,f]) => `<li class="miss">Missing: ${esc(f === "vitals" ? "At least one set of vital signs" : FLABEL[f] || f)}<button data-goto="${s}">Go to</button></li>`).join("")
+      : `<li class="ok">All required fields are complete.</li>`}</ul>
+    <div class="note info">The validation check only confirms required fields are filled in. It does not check whether your chart is accurate.</div>
+    <div class="rowbtns">
+      <button class="btn primary" id="genPCR" ${done && !miss.length ? "" : "disabled"}>Generate PCR (save as PDF)</button>
+      <button class="btn" id="copyCode" ${done && !miss.length ? "" : "disabled"}>Copy submission code</button>
+    </div>
+    <p style="font-size:12px;color:var(--ink-3);margin-top:10px">In the print dialog, choose <b>Save as PDF</b> as the destination. If the PCR window doesn't open, allow pop-ups for this page or use <b>Copy submission code</b> and paste it where your instructor tells you.</p>
+    <div id="codeOut"></div>`;
+}
+
+/* ---------- submission code ---------- */
+function fnv(str){ let h = 0x811c9dc5; for (let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h>>>0).toString(16).padStart(8,"0"); }
+function b64url(bytes){ let s=""; for (let i=0;i<bytes.length;i+=0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i,i+0x8000)); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+async function buildCode(){
+  const payload = { v:VERSION, sc:SIM.sc, st:SIM.student, at:SIM.attempt, t0:SIM.startedAt, t1:new Date().toISOString(),
+    contact:SIM.contactT, dest:SIM.dest, pr:SIM.priority, dep:SIM.departT, log:SIM.log, form:FORM };
+  const json = JSON.stringify(payload);
+  const chk = fnv(json);
+  const raw = new TextEncoder().encode(json);
+  if (typeof CompressionStream !== "undefined") {
+    try {
+      const cs = new Blob([raw]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+      const buf = new Uint8Array(await new Response(cs).arrayBuffer());
+      return `EPCR1D${b64url(buf)}.${chk}`;
+    } catch(e){}
+  }
+  return `EPCR1J${b64url(raw)}.${chk}`;
+}
+
+/* ---------- printable PCR ---------- */
+function pcrDocument(code){
+  const f = k => esc(fv(k)) || "<span class='nd'>—</span>";
+  const opq = k => fv(`opq_${k}_uto`) ? "Unable to obtain" : f("opq_"+k);
+  const pm = (fv("pmh")||"").split("|").filter(Boolean);
+  const pmh = [pm.join(", "), fv("pmh_other"), fv("pmh_none")].filter(Boolean).join("; ");
+  const row = (pairs) => `<tr>${pairs.map(([l,v])=>`<th>${l}</th><td>${v}</td>`).join("")}</tr>`;
+  const vit = FORM.vitals.map(r=>`<tr>${["time","bp","hr","rr","spo2","bgl","gcs","pain","o2"].map(c=>`<td>${esc(r[c]||"")}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="9">None documented</td></tr>`;
+  const tx = FORM.tx.map(r=>`<tr><td>${esc(r.time||"")}</td><td>${esc(TX_LABEL[r.tx]||"")}</td><td>${esc(r.dose||"")}</td><td>${esc(r.route||"")}</td><td>${esc(r.resp||"")}</td></tr>`).join("") || `<tr><td colspan="5">None documented</td></tr>`;
+  const exam = EXAM.map(([k,l]) => `<tr><th>${l}</th><td>${esc(fv("ex_"+k)||"Not assessed")}</td><td>${esc(fv("exn_"+k))}</td></tr>`).join("");
+  const s = sc();
+  return `<!doctype html><html><head><meta charset="utf-8"><title>PCR ${esc(fv("inc_num"))} – ${esc(SIM.student.name)}</title>
+<style>
+  @page{size:letter;margin:.5in}
+  body{font:10.5px/1.35 "IBM Plex Sans",Arial,Helvetica,sans-serif;color:#111;margin:0}
+  .bar{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #14324f;padding-bottom:4px;margin-bottom:8px}
+  .bar h1{font-size:15px;margin:0;color:#14324f}.bar .meta{text-align:right;font-size:9.5px}
+  h2{font-size:10px;text-transform:uppercase;letter-spacing:.08em;background:#14324f;color:#fff;padding:3px 6px;margin:10px 0 0}
+  table{width:100%;border-collapse:collapse;margin:0}
+  th,td{border:1px solid #9aa6b2;padding:3px 5px;text-align:left;vertical-align:top}
+  th{background:#eef2f6;font-weight:600;width:1%;white-space:nowrap}
+  table.list th{width:auto}
+  .nd{color:#999}.narr{border:1px solid #9aa6b2;padding:6px 8px;white-space:pre-wrap;min-height:80px}
+  .code{font:7.5px/1.25 "IBM Plex Mono",Menlo,Consolas,monospace;word-break:break-all;border:1px dashed #555;padding:6px}
+  .sub{page-break-before:always}
+  .noprint{margin:10px 0;padding:10px;background:#e0f0f3;border:1px solid #b8dbe2;font-size:12px}
+  @media print{.noprint{display:none}}
+</style></head><body>
+<div class="noprint"><b>Save this PCR as a PDF:</b> the print dialog should open automatically (if it doesn't, press Ctrl+P or ⌘P). Choose <b>Save as PDF</b> as the destination, then upload the file. <button onclick="window.print()">Open print dialog</button></div>
+<div class="bar"><h1>Patient Care Report — Training</h1><div class="meta">Student: <b>${esc(SIM.student.name)}</b> (${esc(SIM.student.id)})<br>Scenario: ${esc(s.nature)} · Attempt ${SIM.attempt}<br>Generated ${new Date().toLocaleString()}</div></div>
+<h2>Incident</h2><table>
+  ${row([["Incident #",f("inc_num")],["Unit",f("unit")],["Response",f("resp_mode")]])}
+  ${row([["Location",f("inc_addr")],["Crew",f("crew")],["Disposition",f("disp")]])}
+</table>
+<h2>Times</h2><table>
+  ${row([["Call received",f("t_psap")],["Dispatched",f("t_disp")],["En route",f("t_enroute")],["On scene",f("t_onscene")]])}
+  ${row([["Pt contact",f("t_contact")],["Depart scene",f("t_depart")],["At destination",f("t_atdest")],["Transfer of care",f("t_transfer")]])}
+</table>
+<h2>Patient</h2><table>
+  ${row([["Name",`${f("pt_last")}, ${f("pt_first")}`],["DOB",f("pt_dob")],["Age",f("pt_age")],["Sex",f("pt_sex")]])}
+  ${row([["Weight",`${f("pt_wt")} kg`],["Source",f("pt_wt_src")],["Chief complaint",f("cc")],["Duration",f("cc_dur")]])}
+</table>
+<h2>Impression & history</h2><table>
+  ${row([["Primary impression",f("imp_primary")],["Secondary",f("imp_secondary")]])}
+  ${row([["Onset",opq("o")],["Provocation",opq("p")]])}${row([["Quality",opq("q")],["Radiation",opq("r")]])}${row([["Severity",opq("s")],["Time",opq("t")]])}
+  ${row([["Past history",esc(pmh)||"<span class='nd'>—</span>"],["Last oral intake",f("last_intake")]])}
+  ${row([["Medications",f("meds")],["Allergies",f("allergies")]])}
+  ${row([["Events",f("events")],["",""]])}
+</table>
+<h2>Assessment</h2><table>
+  ${row([["LOC",f("a_avpu")],["GCS",`E${f("a_gcs_e")} V${f("a_gcs_v")} M${f("a_gcs_m")}`],["Orientation",f("a_orient")]])}
+  ${row([["Airway",f("a_airway")],["Breathing",f("a_breathing")],["Lung sounds",f("a_lungs")]])}
+  ${row([["Skin",`${f("a_skin_color")} / ${f("a_skin_temp")} / ${f("a_skin_moist")}`],["Pulse",f("a_pulse")],["Pupils",f("a_pupils")]])}
+</table>
+<table class="list" style="margin-top:4px"><tr><th style="width:18%">Region</th><th style="width:16%">Status</th><th>Findings</th></tr>${exam}</table>
+<h2>Vital signs</h2><table class="list"><tr><th>Time</th><th>BP</th><th>Pulse</th><th>Resp</th><th>SpO₂</th><th>BGL</th><th>GCS</th><th>Pain</th><th>O₂</th></tr>${vit}</table>
+<h2>Treatments</h2><table class="list"><tr><th>Time</th><th>Treatment</th><th>Dose</th><th>Route</th><th>Response</th></tr>${tx}</table>
+<h2>Narrative</h2><div class="narr">${esc(fv("narrative"))}</div>
+<h2>Disposition & transfer</h2><table>
+  ${row([["Destination",esc(HOSP[fv("dest")]?.name||"")],["Reason",f("dest_reason")],["Priority",f("priority")]])}
+  ${row([["Position",f("t_pos")],["Condition at dest.",f("cond")],["Care transferred to",f("transfer_to")]])}
+  ${row([["Primary EMT",f("crew_sig")],["Cert #",f("cert_num")],["Attested",fv("attest")?"Yes":"No"]])}
+</table>
+<div class="sub"><h2>Submission code — do not edit</h2>
+<p>Your instructor uses this code to review your call. Submit this whole PDF.</p>
+<div class="code">---BEGIN-EPCR---${code}---END-EPCR---</div></div>
+<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},400);});<\/script>
+</body></html>`;
+}
+
+async function generatePCR(){
+  const code = await buildCode();
+  showCode(code);
+  const html = pcrDocument(code);
+  let w = null;
+  try { w = window.open("", "_blank"); } catch(e){}
+  if (w && w.document) { w.document.open(); w.document.write(html); w.document.close(); return; }
+  // fallback: print in this frame
+  const pv = $("#printView");
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  pv.innerHTML = doc.head.querySelector("style").outerHTML + doc.body.innerHTML.replace(/<script[\s\S]*?<\/script>/g,"");
+  pv.querySelector(".noprint")?.remove();
+  try { window.print(); } catch(e) { toast("Printing is blocked here. Use Copy submission code instead."); }
+}
+function showCode(code){
+  const o = $("#codeOut"); if (!o) return;
+  o.innerHTML = `<div style="margin-top:14px"><label class="lbl">Submission code</label><div class="codebox" id="codeTxt">${esc(code)}</div></div>`;
+}
+async function copyCode(){
+  const code = await buildCode(); showCode(code);
+  try { await navigator.clipboard.writeText(code); toast("Submission code copied."); }
+  catch(e){ const r = document.createRange(); r.selectNodeContents($("#codeTxt")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast("Press Ctrl+C / ⌘C to copy the selected code."); }
+}
+
+/* =====================================================================
+   MODALS
+   ===================================================================== */
+function transportModal(){
+  const root = $("#modalRoot");
+  root.innerHTML = `<div class="scrim"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt">
+    <h3 id="mt">Package & begin transport</h3>
+    <div class="g"><div><label class="lbl" for="m_dest">Destination</label><select class="inp" id="m_dest"><option value="">—</option>${Object.entries(HOSP).map(([k,h])=>`<option value="${k}">${esc(h.name)} — ${esc(h.type)}</option>`).join("")}</select></div>
+    <div><label class="lbl" for="m_pr">Transport priority</label><select class="inp" id="m_pr"><option value="">—</option><option value="2" ${SIM.prio==="2"?"selected":""}>Non-emergent (Code 2)</option><option value="3" ${SIM.prio==="3"?"selected":""}>Emergent (Code 3)</option></select></div></div>
+    <p style="font-size:12px;color:var(--ink-3);margin:0 0 12px">Packaging and loading takes about 4 minutes. You can keep reassessing and treating en route.</p>
+    <div class="rowbtns" style="justify-content:flex-end"><button class="btn" id="m_cancel">Cancel</button><button class="btn primary" id="m_go">Begin transport</button></div>
+  </div></div>`;
+  $("#m_cancel").onclick = () => root.innerHTML = "";
+  $("#m_go").onclick = () => {
+    const dest = $("#m_dest").value, pr = $("#m_pr").value;
+    if (!dest || !pr) { toast("Choose a destination and a priority."); return; }
+    root.innerHTML = ""; doAction("begin_transport", { dest, pr });
+  };
+}
+function confirmModal(title, body, okLabel, onOk){
+  const root = $("#modalRoot");
+  root.innerHTML = `<div class="scrim"><div class="modal" role="dialog" aria-modal="true"><h3>${esc(title)}</h3><p style="margin:0 0 14px">${esc(body)}</p>
+    <div class="rowbtns" style="justify-content:flex-end"><button class="btn" id="c_no">Cancel</button><button class="btn danger" id="c_ok">${esc(okLabel)}</button></div></div></div>`;
+  $("#c_no").onclick = () => root.innerHTML = "";
+  $("#c_ok").onclick = () => { root.innerHTML = ""; onOk(); };
+}
+
+/* =====================================================================
+   EVENTS
+   ===================================================================== */
+document.addEventListener("click", e => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.dataset.g) { curGroup = t.dataset.g; renderLeft(); return; }
+  if (t.dataset.a) { doAction(t.dataset.a); return; }
+  if (t.dataset.sect) { curSect = t.dataset.sect; renderRight(); $("#sect").scrollTop = 0; return; }
+  if (t.dataset.goto) { curSect = t.dataset.goto; renderRight(); return; }
+  if (t.id === "addV") { FORM.vitals.push({ o2:"RA" }); renderRight(); save(); return; }
+  if (t.id === "addT") { FORM.tx.push({}); renderRight(); save(); return; }
+  if (t.dataset.delv !== undefined) { FORM.vitals.splice(+t.dataset.delv,1); renderRight(); save(); return; }
+  if (t.dataset.delt !== undefined) { FORM.tx.splice(+t.dataset.delt,1); renderRight(); save(); return; }
+  if (t.id === "genPCR") { generatePCR(); return; }
+  if (t.id === "copyCode") { copyCode(); return; }
+});
+document.addEventListener("input", e => {
+  const el = e.target;
+  if (!FORM) return;
+  if (el.dataset.k) { FORM.f[el.dataset.k] = el.value; if (el.dataset.k === "narrative") updWC(); renderNav(); renderPcrHead(); save(); return; }
+  if (el.dataset.vr !== undefined) { FORM.vitals[+el.dataset.vr][el.dataset.c] = el.value; save(); return; }
+  if (el.dataset.tr !== undefined) { FORM.tx[+el.dataset.tr][el.dataset.c] = el.value; save(); return; }
+});
+document.addEventListener("change", e => {
+  const el = e.target; if (!FORM) return;
+  if (el.dataset.pmh !== undefined) {
+    const set = new Set((fv("pmh")||"").split("|").filter(Boolean));
+    el.checked ? set.add(el.dataset.pmh) : set.delete(el.dataset.pmh);
+    FORM.f.pmh = [...set].join("|"); save(); return;
+  }
+  if (el.dataset.uto) { const k = el.dataset.uto; FORM.f[`opq_${k}_uto`] = el.checked ? "1" : ""; if (el.checked) FORM.f["opq_"+k] = ""; save(); renderRight(); return; }
+  if (el.id === "f_attest") { FORM.f.attest = el.checked ? "1" : ""; renderNav(); save(); return; }
+  const TIME_KEYS = ["t_enroute","t_onscene","t_contact","t_depart","t_atdest","t_transfer"];
+  const isTime = TIME_KEYS.includes(el.dataset.k) || el.dataset.c === "time";
+  if (el.dataset.k === "pt_dob") { const r = fmtDOB(el.value); el.value = r.v; el.classList.toggle("bad", !r.ok); if (!r.ok) toast("Enter date of birth as MMDDYYYY, for example 01012001."); }
+  if (isTime) { const r = fmtTime(el.value, !!el.dataset.k); el.value = r.v; el.classList.toggle("bad", !r.ok); if (!r.ok) toast("Enter the time as HHMM or HHMMSS, for example 1350."); }
+  if (el.dataset.k || el.dataset.vr !== undefined || el.dataset.tr !== undefined) el.dispatchEvent(new Event("input", { bubbles:true }));
+});
+
+/* ---------- start screen ---------- */
+let pick = null;
+function renderStart(){
+  $("#scList").innerHTML = Object.values(SCEN).map(s => {
+    const sid = $("#s_id").value.trim(), sv = sid ? lsGet(saveKey(sid, s.id)) : null;
+    const tag = !sv ? "" : sv.SIM.phase === "done" ? `<div class="resume">Completed. Opens your finished call and chart.</div>` : `<div class="resume">In progress. Resumes where you left off.</div>`;
+    return `<button class="sc ${pick===s.id?"sel":""}" data-pick="${s.id}"><span class="code">CODE ${s.code}</span><span><div class="t">${esc(s.nature)}</div><div class="d">${esc(s.notes)}</div>${tag}</span></button>`;
+  }).join("");
+  checkStart();
+}
+function checkStart(){
+  const ok = pick && $("#s_name").value.trim() && $("#s_id").value.trim();
+  $("#btnStart").disabled = !ok;
+  $("#startMsg").textContent = ok ? "" : "Enter your name and ID, and pick a call.";
+}
+$("#scList").addEventListener("click", e => { const b = e.target.closest("[data-pick]"); if (!b) return; pick = b.dataset.pick; renderStart(); });
+$("#s_name").addEventListener("input", checkStart); $("#s_id").addEventListener("input", renderStart);
+$("#btnStart").addEventListener("click", () => {
+  const student = { name:$("#s_name").value.trim(), id:$("#s_id").value.trim() };
+  lsSet("student", student);
+  const sv = lsGet(saveKey(student.id, pick));
+  if (sv && sv.SIM) { SIM = sv.SIM; FORM = sv.FORM; SIM.student.name = student.name; if (!FORM.f.t_psap) fillCAD(); save(); }
+  else newSim(pick, student);
+  $("#startScreen").hidden = true; $("#ws").hidden = false; $("#btnRestart").hidden = false;
+  curGroup = SIM.phase === "scene" ? "scene" : "primary"; curSect = "incident";
+  renderDispatch(); render();
+});
+$("#btnRestart").addEventListener("click", () => {
+  confirmModal("Exit this call?", "Your progress is saved. Picking this call again resumes it where you left off. Calls can't be restarted.", "Exit", () => {
+    $("#ws").hidden = true; $("#startScreen").hidden = false; $("#btnRestart").hidden = true; $("#whoLbl").textContent = "";
+    const id = SIM.sc; SIM = null; FORM = null; pick = id; renderStart();
+  });
+});
+(function initStart(){
+  const st = lsGet("student") || {}; $("#s_name").value = st.name || ""; $("#s_id").value = st.id || "";
+  let ok = false; try { localStorage.setItem(STORE+"_probe","1"); ok = localStorage.getItem(STORE+"_probe") === "1"; localStorage.removeItem(STORE+"_probe"); } catch(e){}
+  if (!ok) $("#storeWarn").hidden = false;
+  renderStart();
+})();
+</script>
+</body>
+</html>
