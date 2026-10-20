@@ -197,10 +197,11 @@ textarea.inp{resize:vertical;min-height:70px}
         <div><label class="lbl req" for="s_name">Student name</label><input class="inp" id="s_name" autocomplete="name"></div>
         <div><label class="lbl req" for="s_id">Student ID</label><input class="inp" id="s_id"></div>
       </div>
-      <label class="lbl">Select your call</label>
-      <div class="sc-list" id="scList"></div>
+      <div style="max-width:280px;margin-bottom:6px"><label class="lbl req" for="s_code">Call code</label><input class="inp mono" id="s_code" autocomplete="off" spellcheck="false" placeholder="From your instructor" style="text-transform:uppercase;letter-spacing:.08em"></div>
+      <p id="codeHint" style="font-size:12px;color:var(--ink-3);margin:0 0 14px">Enter the code your instructor gave you for this call.</p>
+      <div id="resumeBox" hidden><label class="lbl">Your calls</label><div class="sc-list" id="scList"></div></div>
       <div class="note" id="storeWarn" hidden>This browser is blocking saved progress. If you refresh or leave the page, your call will be lost. Tell your instructor.</div>
-      <p style="font-size:12px;color:var(--ink-2);margin:0 0 12px">Each call can be run <b>once</b>. If you leave, picking the call again resumes it. It can't be restarted.</p>
+      <p style="font-size:12px;color:var(--ink-2);margin:0 0 12px">Each call can be run <b>once</b>. If you leave, entering the same code (or picking it under Your calls) resumes it. It can't be restarted.</p>
       <div class="rowbtns"><button class="btn primary" id="btnStart" disabled>Respond to call</button><span id="startMsg" style="font-size:12px;color:var(--ink-3)"></span></div>
       <div class="howto">
         <b>How this works</b>
@@ -1394,20 +1395,36 @@ document.addEventListener("change", e => {
 
 /* ---------- start screen ---------- */
 let pick = null;
+/* Call codes are stored hashed so they can't be read from the page source. Codes: see instructor notes. */
+const CODE_HASH = { "748ff6b1":"ams", "e5b4e465":"cp", "5ab06816":"fall" };
+function codeToScenario(code){ const c = String(code||"").trim().toUpperCase().replace(/\s+/g,""); return c ? CODE_HASH[fnv("epcr|" + c)] || null : null; }
 function renderStart(){
-  $("#scList").innerHTML = Object.values(SCEN).map(s => {
-    const sid = $("#s_id").value.trim(), sv = sid ? lsGet(saveKey(sid, s.id)) : null;
+  const sidNow = $("#s_id").value.trim();
+  const mine = Object.values(SCEN).filter(s => sidNow && lsGet(saveKey(sidNow, s.id)));
+  $("#resumeBox").hidden = !mine.length;
+  $("#scList").innerHTML = mine.map(s => {
+    const sid = sidNow, sv = lsGet(saveKey(sid, s.id));
     const tag = !sv ? "" : sv.SIM.phase === "done" ? `<div class="resume">Completed. Opens your finished call and chart.</div>` : `<div class="resume">In progress. Resumes where you left off.</div>`;
     return `<button class="sc ${pick===s.id?"sel":""}" data-pick="${s.id}"><span class="code">CODE ${s.code}</span><span><div class="t">${esc(s.nature)}</div><div class="d">${esc(s.notes)}</div>${tag}</span></button>`;
   }).join("");
   checkStart();
 }
 function checkStart(){
+  const typed = $("#s_code").value.trim();
+  const fromCode = codeToScenario(typed);
+  if (fromCode) pick = fromCode;
+  else if (typed) pick = null;
+  const hint = $("#codeHint");
+  if (!typed) { hint.textContent = "Enter the code your instructor gave you for this call."; hint.style.color = "var(--ink-3)"; }
+  else if (fromCode) { hint.textContent = `Code accepted: ${SCEN[fromCode].nature}.`; hint.style.color = "var(--good)"; }
+  else if (typed.replace(/\s/g,"").length >= 4) { hint.textContent = "Code not recognized. Check it with your instructor."; hint.style.color = "var(--bad)"; }
+  document.querySelectorAll("#scList [data-pick]").forEach(b => b.classList.toggle("sel", b.dataset.pick === pick));
   const ok = pick && $("#s_name").value.trim() && $("#s_id").value.trim();
   $("#btnStart").disabled = !ok;
-  $("#startMsg").textContent = ok ? "" : "Enter your name and ID, and pick a call.";
+  $("#startMsg").textContent = ok ? "" : "Enter your name, ID, and call code.";
 }
-$("#scList").addEventListener("click", e => { const b = e.target.closest("[data-pick]"); if (!b) return; pick = b.dataset.pick; renderStart(); });
+$("#scList").addEventListener("click", e => { const b = e.target.closest("[data-pick]"); if (!b) return; pick = b.dataset.pick; $("#s_code").value = ""; renderStart(); });
+$("#s_code").addEventListener("input", checkStart);
 $("#s_name").addEventListener("input", checkStart); $("#s_id").addEventListener("input", renderStart);
 $("#btnStart").addEventListener("click", () => {
   const student = { name:$("#s_name").value.trim(), id:$("#s_id").value.trim() };
@@ -1422,7 +1439,7 @@ $("#btnStart").addEventListener("click", () => {
 $("#btnRestart").addEventListener("click", () => {
   confirmModal("Exit this call?", "Your progress is saved. Picking this call again resumes it where you left off. Calls can't be restarted.", "Exit", () => {
     $("#ws").hidden = true; $("#startScreen").hidden = false; $("#btnRestart").hidden = true; $("#whoLbl").textContent = "";
-    const id = SIM.sc; SIM = null; FORM = null; pick = id; renderStart();
+    const id = SIM.sc; SIM = null; FORM = null; pick = id; $("#s_code").value = ""; renderStart();
   });
 });
 (function initStart(){
