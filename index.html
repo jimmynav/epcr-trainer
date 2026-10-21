@@ -1526,7 +1526,7 @@ function sectHTML(id){
 function missingFor(sec){
   const miss = [];
   for (const k of REQ[sec] || []) if (!String(fv(k)).trim()) miss.push(k);
-  if (sec === "vitals" && FORM.vitals.length < vitalsNeeded()) miss.push("vitals");
+  if (sec === "vitals" && vitalsCharted() < vitalsNeeded()) miss.push("vitals");
   if (sec === "tx" && false) miss.push("tx");
   return miss;
 }
@@ -1559,7 +1559,7 @@ function finalHTML(){
     <h2>Finalize</h2><p class="hint">Fix every required item, then generate your PCR and save it as a PDF.</p>
     ${done ? "" : `<div class="note">The call isn't over yet. Transport the patient and transfer care before you finalize.</div>`}
     ${done && vitalsTaken() < 3 ? `<div class="note">You took ${vitalsTaken()} set${vitalsTaken() === 1 ? "" : "s"} of vital signs on this call. At least 3 are required, and this will count against you. Chart only the sets you actually took.</div>` : ""}
-    <ul class="valist">${miss.length ? miss.map(([s,f]) => `<li class="miss">Missing: ${esc(f === "vitals" ? `At least ${vitalsNeeded()} sets of vital signs (${FORM.vitals.length} charted)` : FLABEL[f] || f)}<button data-goto="${s}">Go to</button></li>`).join("")
+    <ul class="valist">${miss.length ? miss.map(([s,f]) => `<li class="miss">Missing: ${esc(f === "vitals" ? `At least ${vitalsNeeded()} sets of vital signs (${vitalsCharted()} filled in)` : FLABEL[f] || f)}<button data-goto="${s}">Go to</button></li>`).join("")
       : `<li class="ok">All required fields are complete.</li>`}</ul>
     <div class="note info">The validation check only confirms required fields are filled in. It does not check whether your chart is accurate.</div>
     <div class="rowbtns">
@@ -1704,6 +1704,8 @@ function transportModal(){
 }
 function vitalsTaken(){ return SIM ? SIM.log.filter(l => l.a === "v_set").length : 0; }
 function vitalsNeeded(){ return Math.min(3, vitalsTaken()); }
+/* a row only counts if it actually has a BP, pulse, resp, or SpO2 in it */
+function vitalsCharted(){ return FORM ? FORM.vitals.filter(r => ["bp","hr","rr","spo2"].some(k => String(r[k] || "").trim())).length : 0; }
 function vitalsWarnModal(){
   const root = $("#modalRoot"), n = vitalsTaken();
   root.innerHTML = `<div class="scrim"><div class="modal" role="dialog" aria-modal="true"><h3>Only ${n} set${n === 1 ? "" : "s"} of vital signs</h3>
