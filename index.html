@@ -399,6 +399,7 @@ const ACTIONS = [
   ["vitals","v_ortho","Orthostatic vitals",300],
   ["vitals","v_etco2","Capnography (EtCO₂)",30],
   ["vitals","v_12lead","12-lead ECG",30],
+  ["treat","check_med","Check medication (name, dose, expiration)",20],
   ["treat","toe_splint","Splint toe (buddy tape)",120],
   ["treat","elevate","Elevate extremity",20],
   ["treat","asa81","Aspirin 81 mg PO",30],
@@ -595,7 +596,7 @@ cp: {
   notes:"64 y/o M chest pain. Conscious, breathing.",
   cad:{ psap:"16:41:09", disp:"16:41:58", enroute:"16:42:31", onscene:"16:48:20" },
   triageRN:"Marcus Lee, RN", 
-  dx:{ walk_out:"He walks to the ambulance. Halfway there he stops, short of breath and sweating harder.", ask_etoh:[["Patient","A couple of beers on weekends. Nothing today."]], ask_preg:[["Patient","(laughs) No."]] },
+  dx:{ check_med:"Nitroglycerin 0.4 mg SL tablets, prescribed to Daniel Whitaker, expires 08/2027.", walk_out:"He walks to the ambulance. Halfway there he stops, short of breath and sweating harder.", ask_etoh:[["Patient","A couple of beers on weekends. Nothing today."]], ask_preg:[["Patient","(laughs) No."]] },
   ptHeader:"Adult male", scene:"Single-story home. A lawn mower sits stopped mid-yard. The patient is sitting on the front porch steps holding his chest. His wife is beside him.",
   sceneSafe:"Scene is safe. Mower is off. No hazards.", numPts:"One patient.", moi:"No mechanism of injury.", noi:"Nature of illness: chest pain.",
   ccLt:"Chief complaint: chest pressure. No immediate life threats identified; patient is talking in full sentences.",
@@ -824,6 +825,124 @@ toe: {
     return null;
   },
   events:[]
+},
+
+/* ----------------------------------------------------------------- ANA */
+ana: {
+  id:"ana", code:"3", nature:"Difficulty breathing",
+  incident:"26-108760", unit:"M-62 (BLS)", address:"Pinecrest Apartments, Unit 3B, 905 W Lark St (residence)", caller:"Friend",
+  notes:"22 y/o F difficulty breathing. Conscious.",
+  cad:{ psap:"20:41:12", disp:"20:41:58", enroute:"20:42:30", onscene:"20:48:47" },
+  triageRN:"Maria Santos, RN",
+  dx:{
+    med_id:"Medical alert bracelet: \"Severe peanut allergy – EpiPen.\"",
+    check_med:"EpiPen 0.3 mg auto-injector (2-pack), prescribed to Isabel Ibarbia, expires 06/2027. Solution clear, no particles.",
+    ask_etoh:[["Patient","Just punch. No alcohol."]], ask_preg:[["Patient","No."]], ask_travel:[["Patient","No."]],
+    walk_out:"She stands up, goes pale, and nearly faints. You sit her back down."
+  },
+  ptHeader:"Young adult female",
+  scene:"Apartment with a small birthday party winding down. A friend waves you into the kitchen. The patient is sitting on a kitchen chair, leaning forward with her hands on her knees.",
+  sceneSafe:"Scene is safe. About eight guests, calm. No hazards.", numPts:"One patient.",
+  moi:"No mechanism of injury.", noi:"Nature of illness: allergic reaction with difficulty breathing.",
+  ccLt:"Chief complaint: allergic reaction, throat tightness, trouble breathing. Airway and breathing are threatened.",
+  smr:"No trauma. Spinal immobilization not indicated.", bleed:"No bleeding.",
+  sev(m, F){
+    const doses = F.tx.filter(x => x.id === "epi");
+    const raw = mm => Math.min(1.1, mm / 15);
+    if (!doses.length) return raw(m);
+    const d1 = doses[0].m, e1 = d1 + 2;
+    if (m < e1) return raw(m);
+    const s0 = raw(e1), late = d1 > 8;
+    const floor = late ? 0.15 : 0;
+    let s = floor + (s0 - floor) * Math.max(0, 1 - (m - e1) / 5);
+    if (late) {
+      const d2 = doses[1] ? doses[1].m : null, rb = d1 + 12;
+      if (m >= rb && (d2 === null || m < d2 + 2)) s = Math.min(0.55, floor + (m - rb) / 8);
+      if (d2 !== null && m >= d2 + 2) { const sAt = d2 + 2 < rb ? floor : Math.min(0.55, floor + (d2 + 2 - rb) / 8); s = sAt * Math.max(0, 1 - (m - d2 - 2) / 5); }
+    }
+    return Math.max(0, s);
+  },
+  compute(m, F){
+    const s = this.sev(m, F);
+    const doses = F.tx.filter(x => x.id === "epi");
+    const bump = doses.some(d => m >= d.m && m < d.m + 5) ? 10 : 0;
+    let hr = (doses.length && m >= doses[0].m + 2 ? 105 + 25 * s : 118 + 12 * s) + bump;
+    let sbp = 104 - 28 * s, dbp = 66 - 18 * s, rr = 24 + 4 * s, spo2 = 94 - 4 * s;
+    if (doses.length && m >= doses[0].m + 2 && s < 0.3) { sbp = Math.max(sbp, 112 - 20 * s); dbp = Math.max(dbp, 72 - 12 * s); rr = 16 + 20 * s; spo2 = 98 - 8 * s; }
+    const o2 = o2At(F, m); if (o2 === "nrm") spo2 += 4; else if (o2 === "nc") spo2 += 2;
+    const lastPos = F.tx.filter(x => ["pos_semi","pos_supine","trendelenburg","c_shock","pos_recovery"].includes(x.id) && x.m <= m).pop();
+    if (lastPos && lastPos.id === "pos_semi") rr -= 2;
+    if (lastPos && ["pos_supine","trendelenburg","c_shock"].includes(lastPos.id) && s > 0.2) { spo2 -= 2; rr += 2; }
+    if (F.walked !== undefined && m >= F.walked && m < F.walked + 5) sbp -= 12;
+    const V = sbp < 80 ? 4 : 5;
+    const epiOn = doses.length && m >= doses[0].m + 10 && s < 0.2;
+    return { hr:Math.round(hr), sbp:Math.round(sbp), dbp:Math.round(dbp), rr:Math.round(rr), spo2:Math.min(100, Math.round(spo2)), bgl:98, E:4, V, M:6, swallow:true, pain:0,
+      temp:98.8, tempRoute:"oral", s,
+      skin: epiOn ? "pink, warm, dry; hives fading" : s > 0.85 ? "pale under the hives, cool, moist" : "flushed, warm, moist, with raised hives on arms, neck, and chest",
+      pulseQ: sbp < 90 ? "rapid, weak" : "regular, rapid", pupils:"PERRL, 4 mm",
+      lungs: s >= 0.65 ? "Expiratory wheezes bilaterally; high-pitched stridor over the neck." : s > 0.15 ? "Expiratory wheezes bilaterally." : "Clear bilaterally. Wheezing has resolved." };
+  },
+  present(S){
+    if (S.V < 5) return "Patient is anxious and restless, pale under the hives, answering slowly. High-pitched noise with every breath.";
+    if (S.s >= 0.65) return "Patient is leaning forward, making a high-pitched noise with every breath, getting out only a few words at a time.";
+    if (S.s >= 0.25) return "22 y/o female sitting forward in a kitchen chair, breathing fast, scratching her arms. Lips look puffy.";
+    return "Patient is breathing easier and talking in full sentences. The hives are fading.";
+  },
+  confused: S => S.V < 5,
+  primary:{
+    gen_imp:"Young adult female sitting forward in a kitchen chair, scratching her arms.",
+    airway:S => S.s >= 0.65 ? "Partially obstructed: high-pitched stridor, hoarse voice, lips and tongue swollen. Only a few words at a time."
+      : S.s > 0.15 ? "Patent but hoarse voice. Lips and tongue swollen. No secretions. Speaking in short sentences."
+      : "Patent. Voice nearly normal. Lip swelling going down. Speaking in full sentences.",
+    breathing:S => S.s > 0.15 ? `Rate ${S.rr}, ${rateWord(S.rr)}. Rhythm regular. Labored with accessory muscle use. Chest rise equal bilaterally, shallow.`
+      : `Rate ${S.rr}, ${rateWord(S.rr)}. Rhythm regular. Unlabored. Chest rise equal bilaterally, adequate depth.`,
+    swallow:S => S.s >= 0.65 ? "She can barely swallow; drooling slightly." : "Gag intact. She can swallow but says it feels tight."
+  },
+  ask(id, S){
+    const friend = { ask_id:"Her name is Isabel Ibarbia. I-B-A-R-B-I-A. Birthday's May 17th, 2004.", ask_allergies:"Peanuts. Really bad.",
+      ask_meds:"She has an EpiPen in her purse. And an asthma inhaler, but it's at home.", ask_events:"She ate one of Jake's cookies. They had peanut butter in them." };
+    if (S.V < 5) return [["Patient","(restless, can't get the words out)"]].concat(friend[id] ? [["Friend", friend[id]]] : []);
+    const p = {
+      ask_cc:"I can't... breathe right. My throat is tight.",
+      ask_id:"Isabel... Ibarbia. I-B-A-R-B-I-A. May 17th, 2004. Sixty kilos.",
+      ask_o:"Kind of gradual. My mouth got itchy, then the hives, then my throat.",
+      ask_p:"Sitting up helps. Lying down is worse.", ask_q:"Like my throat is closing.",
+      ask_r:"Throat and chest. Itchy everywhere.", ask_s: S.s > 0.15 ? "Bad. Eight out of ten." : "Much better. Maybe a two.",
+      ask_t:"Started maybe 20 minutes ago. Around 8:25.",
+      ask_signs:"Itchy all over, hives, lips swelling, throat tight, can't catch my breath. Started about 20 minutes ago.",
+      ask_allergies:"Peanuts. Bad. That's it.",
+      ask_meds:"EpiPen, it's in my purse. And an inhaler for asthma, but I left it at home. I haven't used the EpiPen. I was scared to.",
+      ask_pmh:"Peanut allergy since I was little. Mild asthma.",
+      ask_intake:"The cookie, maybe 25 minutes ago. Some punch.",
+      ask_events:"I ate one cookie. Nobody said it had peanut butter. A few minutes later my mouth started itching.",
+      ask_loc:"No.", ask_neckpain:"No.", ask_anticoag:"No.", ask_pde5:"No."
+    };
+    if (id === "ask_bystander") return [["Friend (Maya)","She had one of the cookies Jake brought. We didn't know they had peanut butter in them. Her purse is right there; she always carries an EpiPen."]];
+    return PT(p[id] || "No.");
+  },
+  exam:{
+    ex_head:"Lips and tongue swollen. Mild swelling around the eyes.",
+    ex_neck:"Hives on the neck. Trachea midline.",
+    ex_chest:"Hives across the chest. Accessory muscle use.",
+    ex_abd:"Soft. She says she feels a little nauseated.",
+    ex_ue:"Raised hives on both arms.", ex_le:"Raised hives on both thighs.",
+    ex_pms:"Pulse, motor, and sensation intact in all four extremities.",
+    ex_stroke:"No facial droop or arm drift. Speech hoarse but clear."
+  },
+  onTreat(id, S, F){
+    if (id === "epi") {
+      const n = F.tx.filter(x => x.id === "epi").length;
+      return { text: n === 0 ? "Her own EpiPen 0.3 mg given IM to the lateral right thigh, held in place 3 seconds." : "Second EpiPen from her 2-pack, 0.3 mg IM to the lateral left thigh, held 3 seconds." };
+    }
+    if (id === "oral_glucose") return { text:"Patient: \"I can't swallow that right now.\"" };
+    return null;
+  },
+  events:[
+    { id:"stridor", when:(m, S) => S.s >= 0.65, text:"Patient now makes a high-pitched noise with every breath and can only get out a few words.", alert:true },
+    { id:"confused", when:(m, S) => S.V < 5, text:"Patient becomes anxious and restless and answers slowly. Skin turns pale under the hives.", alert:true },
+    { id:"rebound", when:(m, S, F) => { const d = F.tx.filter(x => x.id === "epi"); return d.length === 1 && d[0].m > 8 && m >= d[0].m + 12; },
+      text:"Patient: \"It's coming back... my throat is getting tight again.\" Wheezing returns.", alert:true }
+  ]
 },
 
 /* ----------------------------------------------------------------- BAR */
@@ -1060,6 +1179,11 @@ function doAction(id, param){
   const entry = { t:t0, a:id };
   let lines = [], alert = false;
 
+  if (id === "check_med") {
+    SIM.log.push(Object.assign(entry, { s:snap(st) }));
+    addFeed(t0, "act", a.label, esc((s.dx && s.dx.check_med) || "No patient medication available to check."));
+    SIM.t = t0 + a.cost; afterAdvance(); render(); save(); return;
+  }
   let dxr = (s.dx && s.dx[id]) || (a.group !== "treat" ? DX[id] : null);
   if (typeof dxr === "function") dxr = dxr(st);
   if (id === "req_pd" && s.pdArrives && SIM.pdReqT == null) SIM.pdReqT = t0;
@@ -1617,7 +1741,7 @@ document.addEventListener("change", e => {
 /* ---------- start screen ---------- */
 let pick = null;
 /* Call codes are stored hashed so they can't be read from the page source. Codes: see instructor notes. */
-const CODE_HASH = { "748ff6b1":"ams", "e5b4e465":"cp", "5ab06816":"fall", "75ccef53":"toe", "05d0faef":"bar" };
+const CODE_HASH = { "748ff6b1":"ams", "e5b4e465":"cp", "5ab06816":"fall", "75ccef53":"toe", "05d0faef":"bar", "4a676b45":"ana" };
 function codeToScenario(code){ const c = String(code||"").trim().toUpperCase().replace(/\s+/g,""); return c ? CODE_HASH[fnv("epcr|" + c)] || null : null; }
 function renderStart(){
   const sidNow = $("#s_id").value.trim();
