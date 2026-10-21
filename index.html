@@ -340,6 +340,7 @@ const ACTIONS = [
   ["exam","ex_le","Lower extremities",30],
   ["exam","ex_pms","Distal pulse / motor / sensation",45],
   ["exam","ex_pupils","Pupils",15],
+  ["exam","ex_lungs","Auscultate lung sounds",30],
   ["exam","ex_stroke","Stroke screen (BE-FAST)",60],
   ["vitals","v_set","Full set of vitals",120],
   ["vitals","v_bgl","Blood glucose (glucometer)",60],
@@ -399,6 +400,7 @@ const ACTIONS = [
   ["vitals","v_ortho","Orthostatic vitals",300],
   ["vitals","v_etco2","Capnography (EtCO₂)",30],
   ["vitals","v_12lead","12-lead ECG",30],
+  ["treat","reassess","Reassess patient (response to treatment)",30],
   ["treat","check_med","Check medication (name, dose, expiration)",20],
   ["treat","toe_splint","Splint toe (buddy tape)",120],
   ["treat","elevate","Elevate extremity",20],
@@ -469,6 +471,15 @@ const DX = {
    SCENARIOS (physiology + scripted findings). No grading here.
    compute(m, F): patient state at m minutes after contact, given flags F.
    ===================================================================== */
+/* What the patient says when reassessed */
+const SAY = {
+  ams: S => S.E < 4 ? ["Patient","(moans, does not answer)"] : S.V < 5 ? ["Patient","(confused) ...Is it lunchtime?"] : ["Patient","I feel a lot better. Still a little shaky."],
+  cp: S => S.sbp < 90 ? ["Patient","I feel like I'm going to pass out."] : ["Patient", `The pressure is about a ${S.pain} out of 10.`],
+  fall: S => ["Patient", S.pain >= 9 ? "It hurts so much!" : `My hip is about a ${S.pain} now.`],
+  toe: S => ["Patient", S.pain >= 8 ? "Ow, that really hurts!" : `It's about a ${S.pain} now.`],
+  bar: S => S.risk ? ["Patient","(gurgling, can't answer)"] : ["Patient","My head still hurts... wait, what happened?"],
+  ana: S => S.V < 5 ? ["Patient","(restless, can't get words out)"] : !S.res ? ["Patient","Still tight... hard to breathe."] : ["Patient","I can breathe so much better."]
+};
 function rateWord(rr){ return rr < 12 ? "slow" : rr > 20 ? "fast" : "normal"; }
 function txAt(F, id){ return F.tx.filter(x => x.id === id); }
 function firstTx(F, ids){ ids = [].concat(ids); const l = F.tx.filter(x => ids.includes(x.id)); return l.length ? l[0].m : null; }
@@ -876,25 +887,26 @@ ana: {
     if (F.walked !== undefined && m >= F.walked && m < F.walked + 5) sbp -= 12;
     const V = sbp < 80 ? 4 : 5;
     const epiOn = doses.length && m >= doses[0].m + 10 && s < 0.2;
+    const res = doses.length > 0 && m >= doses[0].m + 3 && s < 0.15;
     return { hr:Math.round(hr), sbp:Math.round(sbp), dbp:Math.round(dbp), rr:Math.round(rr), spo2:Math.min(100, Math.round(spo2)), bgl:98, E:4, V, M:6, swallow:true, pain:0,
-      temp:98.8, tempRoute:"oral", s,
+      temp:98.8, tempRoute:"oral", s, res,
       skin: epiOn ? "pink, warm, dry; hives fading" : s > 0.85 ? "pale under the hives, cool, moist" : "flushed, warm, moist, with raised hives on arms, neck, and chest",
       pulseQ: sbp < 90 ? "rapid, weak" : "regular, rapid", pupils:"PERRL, 4 mm",
-      lungs: s >= 0.65 ? "Expiratory wheezes bilaterally; high-pitched stridor over the neck." : s > 0.15 ? "Expiratory wheezes bilaterally." : "Clear bilaterally. Wheezing has resolved." };
+      lungs: s >= 0.65 ? "Expiratory wheezes bilaterally; high-pitched stridor over the neck." : !res ? "Expiratory wheezes bilaterally." : "Clear bilaterally. Wheezing has resolved." };
   },
   present(S){
     if (S.V < 5) return "Patient is anxious and restless, pale under the hives, answering slowly. High-pitched noise with every breath.";
     if (S.s >= 0.65) return "Patient is leaning forward, making a high-pitched noise with every breath, getting out only a few words at a time.";
-    if (S.s >= 0.25) return "22 y/o female sitting forward in a kitchen chair, breathing fast, scratching her arms. Lips look puffy.";
+    if (!S.res) return "22 y/o female sitting forward in a kitchen chair, breathing fast, scratching her arms. Lips look puffy.";
     return "Patient is breathing easier and talking in full sentences. The hives are fading.";
   },
   confused: S => S.V < 5,
   primary:{
     gen_imp:"Young adult female sitting forward in a kitchen chair, scratching her arms.",
     airway:S => S.s >= 0.65 ? "Partially obstructed: high-pitched stridor, hoarse voice, lips and tongue swollen. Only a few words at a time."
-      : S.s > 0.15 ? "Patent but hoarse voice. Lips and tongue swollen. No secretions. Speaking in short sentences."
+      : !S.res ? "Patent but hoarse voice. Lips and tongue swollen. No secretions. Speaking in short sentences."
       : "Patent. Voice nearly normal. Lip swelling going down. Speaking in full sentences.",
-    breathing:S => S.s > 0.15 ? `Rate ${S.rr}, ${rateWord(S.rr)}. Rhythm regular. Labored with accessory muscle use. Chest rise equal bilaterally, shallow.`
+    breathing:S => !S.res ? `Rate ${S.rr}, ${rateWord(S.rr)}. Rhythm regular. Labored with accessory muscle use. Chest rise equal bilaterally, shallow.`
       : `Rate ${S.rr}, ${rateWord(S.rr)}. Rhythm regular. Unlabored. Chest rise equal bilaterally, adequate depth.`,
     swallow:S => S.s >= 0.65 ? "She can barely swallow; drooling slightly." : "Gag intact. She can swallow but says it feels tight."
   },
@@ -907,7 +919,7 @@ ana: {
       ask_id:"Isabel... Ibarbia. I-B-A-R-B-I-A. May 17th, 2004. Sixty kilos.",
       ask_o:"Kind of gradual. My mouth got itchy, then the hives, then my throat.",
       ask_p:"Sitting up helps. Lying down is worse.", ask_q:"Like my throat is closing.",
-      ask_r:"Throat and chest. Itchy everywhere.", ask_s: S.s > 0.15 ? "Bad. Eight out of ten." : "Much better. Maybe a two.",
+      ask_r:"Throat and chest. Itchy everywhere.", ask_s: !S.res ? "Bad. Eight out of ten." : "Much better. Maybe a two.",
       ask_t:"Started maybe 20 minutes ago. Around 8:25.",
       ask_signs:"Itchy all over, hives, lips swelling, throat tight, can't catch my breath. Started about 20 minutes ago.",
       ask_allergies:"Peanuts. Bad. That's it.",
@@ -1179,6 +1191,14 @@ function doAction(id, param){
   const entry = { t:t0, a:id };
   let lines = [], alert = false;
 
+  if (id === "reassess") {
+    const P = s.primary, br = typeof P.breathing === "function" ? P.breathing(st) : P.breathing;
+    const say = SAY[SIM.sc] ? SAY[SIM.sc](st, SIM.F) : null;
+    const html = `<b>LOC:</b> ${esc(avpuText(st))}<br><b>Breathing:</b> ${esc(br)}<br><b>Skin:</b> ${esc(st.skin)}` + (say ? `<br><span class="spk">${esc(say[0])}:</span> ${esc(say[1])}` : "");
+    SIM.log.push(Object.assign(entry, { s:snap(st) }));
+    addFeed(t0, "act", a.label, html);
+    SIM.t = t0 + a.cost; afterAdvance(); render(); save(); return;
+  }
   if (id === "check_med") {
     SIM.log.push(Object.assign(entry, { s:snap(st) }));
     addFeed(t0, "act", a.label, esc((s.dx && s.dx.check_med) || "No patient medication available to check."));
@@ -1223,6 +1243,7 @@ function doAction(id, param){
   } else if (a.group === "exam") {
     let r = s.exam[id];
     if (id === "ex_pupils") r = st.pupils;
+    if (id === "ex_lungs") r = st.lungs;
     if (typeof r === "function") r = r(st);
     lines.push(["", r || "No abnormality found."]);
   } else if (a.group === "vitals") {
@@ -1339,8 +1360,8 @@ function renderLeft(){
   }).join("");
   // feed
   const feed = $("#feed");
-  feed.innerHTML = SIM.feed.map(e => `<div class="ev ${e.kind==="sys"?"sys":""} ${e.alert?"alert":""}"><div class="tm">${hms(e.t)}</div><div>${e.label?`<span class="act-l">${esc(e.label)}</span> — `:""}${e.html}</div></div>`).join("");
-  feed.scrollTop = feed.scrollHeight;
+  feed.innerHTML = SIM.feed.slice().reverse().map(e => `<div class="ev ${e.kind==="sys"?"sys":""} ${e.alert?"alert":""}"><div class="tm">${hms(e.t)}</div><div>${e.label?`<span class="act-l">${esc(e.label)}</span> — `:""}${e.html}</div></div>`).join("");
+  feed.scrollTop = 0;
 }
 
 /* =====================================================================
