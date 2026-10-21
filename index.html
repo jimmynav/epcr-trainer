@@ -313,12 +313,12 @@ const ACTIONS = [
   ["primary","gcs","Determine GCS",30],
   ["history","ask_cc","Chief complaint",20],
   ["history","ask_id","Name / DOB / weight",20],
-  ["history","ask_o","O · Onset",20],
+  ["history","ask_o","O · Onset (sudden or gradual)",20],
   ["history","ask_p","P · Provocation / palliation",20],
   ["history","ask_q","Q · Quality",15],
   ["history","ask_r","R · Region / radiation",15],
   ["history","ask_s","S · Severity",10],
-  ["history","ask_t","T · Time / duration",15],
+  ["history","ask_t","T · Time (when it started)",15],
   ["history","ask_signs","S · Signs & symptoms",20],
   ["history","ask_allergies","A · Allergies",15],
   ["history","ask_meds","M · Medications",30],
@@ -552,8 +552,8 @@ ams: {
     } : {
       ask_cc:PT("I got shaky and sweaty, and then everything got foggy."),
       ask_id:PT("Linda Okafor. Last name is O-K-A-F-O-R. February 9th, 1964. About 75 kilograms."),
-      ask_o:PT("Maybe half an hour ago I got shaky and sweaty."), ask_p:PT("Nothing made it better or worse."), ask_q:PT("No pain. Just foggy and shaky."),
-      ask_r:PT("Nothing hurts anywhere."), ask_s:PT("No pain. I feel weak, maybe a 4 out of 10 shaky."), ask_t:PT("About 30 or 40 minutes, I think."),
+      ask_o:PT("It came on over a few minutes. First shaky and sweaty, then everything got foggy."), ask_p:PT("Nothing made it better or worse."), ask_q:PT("No pain. Just foggy and shaky."),
+      ask_r:PT("Nothing hurts anywhere."), ask_s:PT("No pain. I feel weak, maybe a 4 out of 10 shaky."), ask_t:PT("Around 1:30, I think. So about half an hour ago."),
       ask_signs:PT("Sweaty, shaky, confused. It started about half an hour ago. No chest pain, no headache, no trouble breathing."),
       ask_allergies:PT("Penicillin. I get hives."), ask_meds:PT("Lantus at night, Humalog with meals, metformin, and lisinopril."),
       ask_pmh:PT("Diabetes, about 20 years. And blood pressure."), ask_intake:PT("I took my Humalog at noon and skipped lunch. Just coffee."),
@@ -631,9 +631,9 @@ cp: {
   ask(id, S){
     const p = {
       ask_cc:"This pressure in my chest. It's bad.", ask_id:"Daniel Whitaker, last name W-H-I-T-A-K-E-R. March 14th, 1962. About 98 kilograms.",
-      ask_o:"About 30 minutes ago while I was mowing. It didn't go away when I sat down.", ask_p:"Nothing makes it better. Walking made it worse.",
+      ask_o:"All of a sudden, while I was mowing. It didn't go away when I sat down.", ask_p:"Nothing makes it better. Walking made it worse.",
       ask_q:"Pressure. Like someone's sitting on my chest.", ask_r:"It goes into my left arm and up into my jaw.", ask_s:`${S.pain} out of 10.`,
-      ask_t:"Constant since it started. About half an hour now.", ask_signs:"Sweaty, a little short of breath, sick to my stomach. It all started with the pressure about 30 minutes ago. No vomiting.",
+      ask_t:"About 30 minutes ago, around 4:20. It's been constant since.", ask_signs:"Sweaty, a little short of breath, sick to my stomach. It all started with the pressure about 30 minutes ago. No vomiting.",
       ask_allergies:"No allergies.", ask_meds:"Metoprolol, atorvastatin, and a baby aspirin every morning. I have nitro pills from when I got my stent.",
       ask_pmh:"Heart attack in 2019; they put a stent in. High blood pressure and high cholesterol.", ask_intake:"Coffee and toast around 8, water at noon.",
       ask_events:"I was mowing the front lawn, got this pressure, sat down, started sweating. My wife called 911.", ask_loc:"No.",
@@ -703,8 +703,8 @@ fall: {
   ask(id, S){
     const p = {
       ask_cc:"My right hip. I can't get up.", ask_id:"Margaret Ellison, last name E-L-L-I-S-O-N. June 2nd, 1945. About 58 kilograms.",
-      ask_o:"When I fell, about 40 minutes ago.", ask_p:"Any movement of my leg makes it much worse. Holding still helps a little.",
-      ask_q:"Sharp and deep.", ask_r:"Into my groin and the front of my thigh.", ask_s:`${S.pain} out of 10.`, ask_t:"Constant since I fell.",
+      ask_o:"All at once, the moment I fell.", ask_p:"Any movement of my leg makes it much worse. Holding still helps a little.",
+      ask_q:"Sharp and deep.", ask_r:"Into my groin and the front of my thigh.", ask_s:`${S.pain} out of 10.`, ask_t:"About 40 minutes ago, around a quarter to nine. It's hurt the whole time since.",
       ask_signs:"Just the hip, ever since I fell about 40 minutes ago. The back of my head is a little sore.", ask_allergies:"Sulfa. I get a rash.",
       ask_meds:"Eliquis twice a day, metoprolol, amlodipine, and Fosamax once a week.", ask_pmh:"Atrial fibrillation, high blood pressure, and osteoporosis.",
       ask_intake:"Toast and tea around 7.",
@@ -1082,8 +1082,8 @@ function sectHTML(id){
       ${box(inp("imp_secondary",{label:"Secondary impression",type:"select",options:IMPRESSIONS}))}
     </div>
     <fieldset><legend>OPQRST</legend><div class="g g3">
-      ${[["o","Onset"],["p","Provocation / palliation"],["q","Quality"],["r","Region / radiation"],["s","Severity (0–10)"],["t","Time"]].map(([k,l]) => { const u = !!fv(`opq_${k}_uto`);
-        return box(`<label class="lbl" for="f_opq_${k}">${l}</label><input class="inp" id="f_opq_${k}" data-k="opq_${k}" value="${esc(u ? "" : fv("opq_"+k))}" ${u ? 'disabled placeholder="Unable to obtain"' : ""}>
+      ${[["o","Onset","Sudden or gradual"],["p","Provocation / palliation","What makes it better / worse"],["q","Quality","In the patient's words"],["r","Region / radiation","Where, and does it spread"],["s","Severity (0–10)","0–10"],["t","Time","When it started"]].map(([k,l,ph]) => { const u = !!fv(`opq_${k}_uto`);
+        return box(`<label class="lbl" for="f_opq_${k}">${l}</label><input class="inp" id="f_opq_${k}" data-k="opq_${k}" value="${esc(u ? "" : fv("opq_"+k))}" ${u ? 'disabled placeholder="Unable to obtain"' : `placeholder="${ph}"`}>
           <label class="uto"><input type="checkbox" data-uto="${k}" ${u ? "checked" : ""}> Unknown / unable to obtain</label>`); }).join("")}
     </div></fieldset>
     <fieldset><legend>Past medical history</legend>
