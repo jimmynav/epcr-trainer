@@ -837,7 +837,24 @@ let curGroup = "scene", curSect = "incident";
 function sc(){ return SCEN[SIM.sc]; }
 function mNow(){ return SIM.contactT === null ? 0 : (SIM.t - SIM.contactT) / 60; }
 function stateAt(m){ return sc().compute(m, SIM.F); }
-function S(){ return stateAt(mNow()); }
+/* Normal reading-to-reading variation on top of the clinical trend.
+   Deterministic per student and per moment, so the same reading never changes on re-render. */
+function jitter(key, amp){
+  if (!SIM.seed) SIM.seed = Math.random().toString(36).slice(2);
+  const r = seededRand(SIM.seed + "|" + key + "|" + Math.floor(SIM.t / 15));
+  r(); return Math.round((r() * 2 - 1) * amp);
+}
+function S(){
+  const st = Object.assign({}, stateAt(mNow()));
+  if (SIM.contactT === null) return st;
+  st.hr  = Math.max(30, st.hr + jitter("hr", 3));
+  st.sbp = st.sbp + jitter("sbp", 6);
+  st.dbp = Math.min(st.sbp - 20, st.dbp + jitter("dbp", 4));
+  st.rr  = Math.max(6, st.rr + jitter("rr", 2));
+  st.spo2 = Math.min(100, st.spo2 + jitter("spo2", 1));
+  st.bgl = Math.max(20, st.bgl + jitter("bgl", 2));
+  return st;
+}
 
 function newSim(id, student){
   const s = SCEN[id];
