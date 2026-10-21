@@ -481,9 +481,9 @@ const PT = (t) => [["Patient", t]];
 const SCEN = {
 /* ---------------------------------------------------------------- AMS */
 ams: {
-  id:"ams", code:"3", nature:"Sick person – altered mental status",
+  id:"ams", code:"3", nature:"Sick person – confused",
   incident:"26-104871", unit:"M-62 (BLS)", address:"2219 E Linden Ct (residence)", caller:"Husband",
-  notes:"62 y/o F confused and sweating. Caller states pt is diabetic. Conscious, breathing.",
+  notes:"62 y/o F confused. Conscious, breathing.",
   cad:{ psap:"13:52:14", disp:"13:53:02", enroute:"13:53:40", onscene:"14:00:51" },
   triageRN:"Dana Whitfield, RN", 
   dx:{ walk_out:"She stands, sways, and her knees buckle. You catch her and sit her back down.", med_id:"Medical alert bracelet: \"Diabetic – insulin dependent.\"", ask_etoh:[["Husband","She doesn't drink."]], ask_preg:[["Husband","No. She's 62."]],
@@ -592,7 +592,7 @@ ams: {
 cp: {
   id:"cp", code:"3", nature:"Chest pain",
   incident:"26-105233", unit:"M-62 (BLS)", address:"714 N Cambridge St (residence, front yard)", caller:"Wife",
-  notes:"64 y/o M chest pain, sweating. Conscious, breathing.",
+  notes:"64 y/o M chest pain. Conscious, breathing.",
   cad:{ psap:"16:41:09", disp:"16:41:58", enroute:"16:42:31", onscene:"16:48:20" },
   triageRN:"Marcus Lee, RN", 
   dx:{ walk_out:"He walks to the ambulance. Halfway there he stops, short of breath and sweating harder.", ask_etoh:[["Patient","A couple of beers on weekends. Nothing today."]], ask_preg:[["Patient","(laughs) No."]] },
@@ -668,9 +668,9 @@ cp: {
 
 /* ---------------------------------------------------------------- FALL */
 fall: {
-  id:"fall", code:"2", nature:"Fall – injured",
+  id:"fall", code:"2", nature:"Fall – hip pain",
   incident:"26-106019", unit:"M-62 (BLS)", address:"3301 W Maple Ave, Unit 4 (residence)", caller:"Neighbor",
-  notes:"81 y/o F fell, unable to get up. Neighbor on scene. Conscious, breathing.",
+  notes:"81 y/o F hip pain after a fall. Conscious, breathing.",
   cad:{ psap:"09:14:47", disp:"09:15:30", enroute:"09:16:02", onscene:"09:24:39" },
   triageRN:"Priya Nair, RN", 
   dx:{ walk_out:"She can't put any weight on the right leg and nearly falls. You get her back down.", med_id:"Medical alert bracelet: \"On blood thinners – Eliquis.\"", ask_polst:[["Patient","I have a POLST on the fridge. Full treatment."]],
@@ -747,9 +747,9 @@ fall: {
 
 /* ----------------------------------------------------------------- TOE */
 toe: {
-  id:"toe", code:"2", nature:"Injured person – foot pain",
+  id:"toe", code:"2", nature:"Toe pain",
   incident:"26-107442", unit:"M-62 (BLS)", address:"1186 N Glassell Ct (residence)", caller:"Patient",
-  notes:"50 y/o M injured toe, unable to walk normally. Conscious, breathing.",
+  notes:"50 y/o M toe pain. Conscious, breathing.",
   cad:{ psap:"19:22:08", disp:"19:23:15", enroute:"19:23:52", onscene:"19:31:40" },
   triageRN:"Alex Romero, RN",
   dx:{ walk_out:"He hops and limps to the ambulance on his heel, wincing with every step. Pain 8/10.", ask_tetanus:[["Patient","Maybe ten years ago?"]], ask_etoh:[["Patient","One beer with dinner."]], ask_preg:[["Patient","(laughs) No."]],
@@ -828,9 +828,9 @@ toe: {
 
 /* ----------------------------------------------------------------- BAR */
 bar: {
-  id:"bar", code:"3", nature:"Assault – head injury",
+  id:"bar", code:"3", nature:"Assault – head pain",
   incident:"26-108125", unit:"M-62 (BLS)", address:"The Bussin' Bassil Bar, 418 E Orchard Ave (bar)", caller:"Bartender",
-  notes:"24 y/o M struck in head with a glass. Bleeding from head. Conscious. Suspect fled on foot; may still be in the area. PD not yet on scene.",
+  notes:"24 y/o M head pain, bleeding from the head. Conscious. Suspect fled on foot; may still be in the area. PD not yet on scene.",
   cad:{ psap:"23:14:36", disp:"23:15:20", enroute:"23:15:48", onscene:"23:21:05" },
   triageRN:"Isabel Ibarra, RN", pdArrives:240,
   dx:{
