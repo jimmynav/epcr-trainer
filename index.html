@@ -399,6 +399,8 @@ const ACTIONS = [
   ["vitals","v_ortho","Orthostatic vitals",300],
   ["vitals","v_etco2","Capnography (EtCO₂)",30],
   ["vitals","v_12lead","12-lead ECG",30],
+  ["treat","toe_splint","Splint toe (buddy tape)",120],
+  ["treat","elevate","Elevate extremity",20],
   ["treat","asa81","Aspirin 81 mg PO",30],
   ["treat","charcoal","Activated charcoal 50 g PO",60],
   ["treat","tourniquet","Apply tourniquet",60],
@@ -409,6 +411,7 @@ const ACTIONS = [
   ["treat","hot_pack","Hot pack",20],
   ["treat","trendelenburg","Position: Trendelenburg",20],
   ["treat","paper_bag","Coach breathing into paper bag",60],
+  ["transport","walk_out","Have patient walk to the ambulance",60],
   ["transport","begin_transport","Package & begin transport",240],
   ["transport","arrive","Arrive at destination",0],
   ["transport","transfer","Transfer care & give report",180]
@@ -417,9 +420,9 @@ const ACT = Object.fromEntries(ACTIONS.map(a => [a[1], {group:a[0], id:a[1], lab
 
 /* Treatment choices for the chart (same ids as the actions) */
 const TX_IDS = ["o2_nc","o2_nrm","bvm","opa","npa","suction","pos_semi","pos_recovery","pos_supine","oral_glucose","aspirin","nitro","naloxone","epi","albuterol","collar","hip_pad","traction","realign","scoop","vacuum","cold_pack","blanket","bleeding",
-  "c_shock","asa81","charcoal","tourniquet","pelvic_binder","lsb","ked","sling","hot_pack","trendelenburg","paper_bag"];
+  "toe_splint","elevate","c_shock","asa81","charcoal","tourniquet","pelvic_binder","lsb","ked","sling","hot_pack","trendelenburg","paper_bag"];
 const TX_LABEL = {
-  c_shock:"Shock management (position, warmth)",
+  c_shock:"Shock management (position, warmth)", toe_splint:"Splint – toe (buddy tape)", elevate:"Elevation of extremity",
   asa81:"Aspirin 81 mg", charcoal:"Activated charcoal", tourniquet:"Tourniquet", pelvic_binder:"Pelvic binder", lsb:"Long spine board", ked:"KED",
   sling:"Sling & swathe", hot_pack:"Hot pack", trendelenburg:"Positioning – Trendelenburg", paper_bag:"Paper bag breathing",
   o2_nc:"Oxygen – nasal cannula", o2_nrm:"Oxygen – non-rebreather mask", bvm:"BVM ventilation", opa:"OPA", npa:"NPA", suction:"Suction",
@@ -439,8 +442,10 @@ const TX_RESP = {
   traction:"Traction splint applied.", realign:"You attempt to straighten the extremity.",
   asa81:"Patient chews one 81 mg aspirin.", charcoal:"Patient drinks the charcoal slurry.", tourniquet:"Tourniquet applied and tightened.",
   pelvic_binder:"Pelvic binder applied and tightened.", lsb:"Patient log-rolled and secured to a long spine board.", ked:"KED applied.",
+  toe_splint:"Injured toe padded and buddy-taped to the adjacent toe.", elevate:"Extremity elevated on pillows.",
   sling:"Sling and swathe applied.", hot_pack:"Hot pack applied.", trendelenburg:"Patient placed supine with legs elevated.", paper_bag:"Patient coached to breathe into a paper bag."
 };
+const P_ALERT_WALK = ["toe","fall","ams","cp"];
 /* Responses for look-alike options that aren't in the treat group. Scenario files can override with s.dx[id]. */
 const DX = {
   req_pd:"Dispatch: \"Copy. PD en route, ETA 15 minutes.\"",
@@ -449,7 +454,7 @@ const DX = {
   req_bls:"Dispatch: \"Copy. Additional BLS unit assigned.\"",
   hazmat:"No unusual odors, containers, or placards.", utilities:"No downed lines, no gas odor.",
   mci:"One patient. MCI not indicated.", base_contact:"Base hospital: \"BLS unit, no orders needed. Treat and transport per protocol.\"",
-  supervisor:"Supervisor acknowledges.", cap_refill:"(computed)", jaw_thrust:"Jaw-thrust performed.", med_id:"No medical ID jewelry found.",
+  supervisor:"Supervisor acknowledges.", walk_out:"The patient walks to the ambulance with your help.", cap_refill:"(computed)", jaw_thrust:"Jaw-thrust performed.", med_id:"No medical ID jewelry found.",
   rapid_trauma:"Rapid head-to-toe sweep: no immediate life threats found. Use focused exams to document specific findings.",
   monitor:"There is no cardiac monitor on this BLS unit. ECG interpretation is outside EMT scope.",
   ask_travel:[["Patient","No."]], ask_etoh:[["Patient","No."]], ask_preg:[["Patient","No."]], ask_bm:[["Patient","This morning. Normal."]],
@@ -480,7 +485,7 @@ ams: {
   notes:"62 y/o F confused and sweating. Caller states pt is diabetic. Conscious, breathing.",
   cad:{ psap:"13:52:14", disp:"13:53:02", enroute:"13:53:40", onscene:"14:00:51" },
   triageRN:"Dana Whitfield, RN", 
-  dx:{ med_id:"Medical alert bracelet: \"Diabetic – insulin dependent.\"", ask_etoh:[["Husband","She doesn't drink."]], ask_preg:[["Husband","No. She's 62."]],
+  dx:{ walk_out:"She stands, sways, and her knees buckle. You catch her and sit her back down.", med_id:"Medical alert bracelet: \"Diabetic – insulin dependent.\"", ask_etoh:[["Husband","She doesn't drink."]], ask_preg:[["Husband","No. She's 62."]],
        ask_polst:[["Husband","No, nothing like that."]], ask_travel:[["Husband","No."]], ask_fever:[["Husband","No, she's been fine."]], ask_bm:[["Husband","I don't know."]],
        ask_tetanus:[["Husband","No idea."]] },
   ptHeader:"Adult female", scene:"Single-story home. The husband meets you at the door and leads you to the living room. The patient is sitting on the couch with the TV on.",
@@ -589,7 +594,7 @@ cp: {
   notes:"64 y/o M chest pain, sweating. Conscious, breathing.",
   cad:{ psap:"16:41:09", disp:"16:41:58", enroute:"16:42:31", onscene:"16:48:20" },
   triageRN:"Marcus Lee, RN", 
-  dx:{ ask_etoh:[["Patient","A couple of beers on weekends. Nothing today."]], ask_preg:[["Patient","(laughs) No."]] },
+  dx:{ walk_out:"He walks to the ambulance. Halfway there he stops, short of breath and sweating harder.", ask_etoh:[["Patient","A couple of beers on weekends. Nothing today."]], ask_preg:[["Patient","(laughs) No."]] },
   ptHeader:"Adult male", scene:"Single-story home. A lawn mower sits stopped mid-yard. The patient is sitting on the front porch steps holding his chest. His wife is beside him.",
   sceneSafe:"Scene is safe. Mower is off. No hazards.", numPts:"One patient.", moi:"No mechanism of injury.", noi:"Nature of illness: chest pain.",
   ccLt:"Chief complaint: chest pressure. No immediate life threats identified; patient is talking in full sentences.",
@@ -667,7 +672,7 @@ fall: {
   notes:"81 y/o F fell, unable to get up. Neighbor on scene. Conscious, breathing.",
   cad:{ psap:"09:14:47", disp:"09:15:30", enroute:"09:16:02", onscene:"09:24:39" },
   triageRN:"Priya Nair, RN", 
-  dx:{ med_id:"Medical alert bracelet: \"On blood thinners – Eliquis.\"", ask_polst:[["Patient","I have a POLST on the fridge. Full treatment."]],
+  dx:{ walk_out:"She can't put any weight on the right leg and nearly falls. You get her back down.", med_id:"Medical alert bracelet: \"On blood thinners – Eliquis.\"", ask_polst:[["Patient","I have a POLST on the fridge. Full treatment."]],
        ask_tetanus:[["Patient","Maybe five years ago?"]], ask_etoh:[["Patient","A glass of wine with dinner sometimes. Nothing today."]], ask_preg:[["Patient","No, dear."]],
        ex_edema:"Trace edema at both ankles.", lsb:"Patient log-rolled onto the board. She cries out and says the board hurts her hip and back.",
        pelvic_binder:"As the binder tightens over her hip, she screams in pain." },
@@ -734,6 +739,87 @@ fall: {
   },
   onTransport(F, m){
     if (firstTx(F, ["hip_pad","vacuum","scoop"]) === null) { F.movedUnsplinted = m; return { text:"As you lift her to the gurney without stabilizing the hip, she cries out. Pain 10/10.", alert:true }; }
+    return null;
+  },
+  events:[]
+},
+
+/* ----------------------------------------------------------------- TOE */
+toe: {
+  id:"toe", code:"2", nature:"Injured person – foot pain",
+  incident:"26-107442", unit:"M-62 (BLS)", address:"1186 N Glassell Ct (residence)", caller:"Patient",
+  notes:"50 y/o M injured toe, unable to walk normally. Conscious, breathing.",
+  cad:{ psap:"19:22:08", disp:"19:23:15", enroute:"19:23:52", onscene:"19:31:40" },
+  triageRN:"Alex Romero, RN",
+  dx:{ walk_out:"He hops and limps to the ambulance on his heel, wincing with every step. Pain 8/10.", ask_tetanus:[["Patient","Maybe ten years ago?"]], ask_etoh:[["Patient","One beer with dinner."]], ask_preg:[["Patient","(laughs) No."]],
+       traction:"You start sizing a traction splint. Patient: \"For my toe?\" Pain unchanged.",
+       lsb:"Patient is log-rolled onto a long spine board. He looks confused: \"It's just my toe.\"",
+       ked:"KED applied. Patient: \"Is this really necessary? It's my toe.\"",
+       collar:"Cervical collar applied. Patient: \"My neck is fine. It's my toe.\"",
+       pelvic_binder:"Pelvic binder applied. Patient: \"Why is this on my hips?\"" },
+  ptHeader:"Adult male",
+  scene:"Single-story home. The patient answers the door himself, hopping on his left foot, and sits down on the living room couch.",
+  sceneSafe:"Scene is safe. No hazards.", numPts:"One patient.",
+  moi:"Mechanism: stubbed right foot on a coffee table leg while walking barefoot. No fall.",
+  noi:"No medical complaint apparent. This is an injury.",
+  ccLt:"Chief complaint: right big toe pain after stubbing it. No immediate life threats.",
+  smr:"Isolated foot injury, no fall, no head strike: spinal immobilization not indicated.",
+  bleed:"No major bleeding. No open wounds.",
+  compute(m, F){
+    let pain = 6;
+    const sp = firstTx(F, "toe_splint"), cp = firstTx(F, "cold_pack"), el = firstTx(F, "elevate");
+    if (sp !== null && m >= sp + 1) pain -= 2;
+    if (cp !== null && m >= cp + 2) pain -= 1;
+    if (el !== null && m >= el + 2) pain -= 1;
+    pain = Math.max(2, pain);
+    const ra = firstTx(F, "realign");
+    if (ra !== null && m >= ra) pain = m < ra + 10 ? 9 : Math.max(pain, 7);
+    if (F.walked !== undefined && m >= F.walked && m < F.walked + 6) pain = Math.max(pain, 8);
+    if (F.movedUnsplinted !== undefined && m >= F.movedUnsplinted && m < F.movedUnsplinted + 6) pain = Math.max(pain, 7);
+    const o2 = o2At(F, m);
+    return { hr:82 + pain, sbp:136 + pain, dbp:88, rr:16, spo2: o2 ? 99 : 98, bgl:104, E:4, V:5, M:6, swallow:true, pain,
+      temp:98.4, tempRoute:"oral", skin:"pink, warm, dry", pulseQ:"regular, strong", pupils:"PERRL, 3 mm", lungs:"Clear and equal bilaterally." };
+  },
+  present(S){
+    if (S.pain >= 8) return "Patient grimaces and grabs his foot, swearing under his breath.";
+    return "50 y/o male sitting on the couch holding his right foot, wincing. Alert and talking.";
+  },
+  confused: () => false,
+  primary:{
+    gen_imp:"Adult male in mild distress from foot pain. Alert. No obvious life threats.",
+    airway:"Patent. No secretions or abnormal airway sounds. Speaking in full, complete sentences.",
+    breathing:S => `RR ${S.rr}, unlabored.`, swallow:"Gag intact; swallows normally."
+  },
+  ask(id, S){
+    const p = {
+      ask_cc:"I jammed my big toe on the coffee table. It really hurts.",
+      ask_id:"Robert Delgado, last name D-E-L-G-A-D-O. April 11th, 1976. About 92 kilograms.",
+      ask_o:"All at once, the second I kicked the table.",
+      ask_p:"Walking on it or touching it makes it worse. Keeping it still helps a bit.",
+      ask_q:"Throbbing.", ask_r:"Just the right big toe. It doesn't go anywhere else.", ask_s:`${S.pain} out of 10.`,
+      ask_t:"About 45 minutes ago, around a quarter to seven. It's hurt the whole time since.",
+      ask_signs:"My toe is swollen and turning purple. Started about 45 minutes ago. Nothing else hurts.",
+      ask_allergies:"Codeine. It makes me throw up.", ask_meds:"Lisinopril for blood pressure. That's it.",
+      ask_pmh:"High blood pressure. Nothing else.", ask_intake:"Dinner around 6:30.",
+      ask_events:"I was walking to the kitchen in the dark and kicked the table leg. I didn't fall. I caught myself on the couch.",
+      ask_loc:"No.", ask_neckpain:"No.", ask_anticoag:"No.", ask_pde5:"No."
+    };
+    if (id === "ask_bystander") return [["Wife","He kicked the table and yelled. He didn't fall or hit anything else."]];
+    return PT(p[id] || "No.");
+  },
+  exam:{
+    ex_head:"Atraumatic.", ex_neck:"No midline tenderness. Full range of motion without pain.",
+    ex_le:"Right great toe swollen with bruising at the base. Tender to touch. No deformity, no open wound. Left foot normal.",
+    ex_pms:"Right foot: pedal pulse present, cap refill under 2 seconds, sensation intact, can wiggle the toes (painful). Left foot normal.",
+    ex_stroke:"Negative: no facial droop, no arm drift, speech clear."
+  },
+  onTreat(id){
+    if (id === "realign") return { text:"You pull on the toe to straighten it. Patient yells and pulls his foot away. Pain 9/10.", alert:true };
+    return null;
+  },
+  onTransport(F, m){
+    if (F.walked !== undefined) return null;
+    if (firstTx(F, "toe_splint") === null) { F.movedUnsplinted = m; return { text:"Moving him to the gurney, his unsplinted toe catches the edge. He winces. Pain 7/10.", alert:true }; }
     return null;
   },
   events:[]
@@ -848,7 +934,7 @@ function orderFor(g){
 function allowed(a){
   const ph = SIM.phase;
   if (ph === "done") return false;
-  if (a.id === "begin_transport") return ph === "care";
+  if (a.id === "begin_transport" || a.id === "walk_out") return ph === "care";
   if (a.id === "arrive") return ph === "transport";
   if (a.id === "transfer") return ph === "arrived";
   if (a.rule === "pre") return ph === "scene";
@@ -867,6 +953,7 @@ function doAction(id, param){
   const dxr = (s.dx && s.dx[id]) || (a.group !== "treat" ? DX[id] : null);
   if (dxr && a.group !== "treat") {
     if (id === "cap_refill") lines.push(["", /cool|cold/.test(st.skin) ? "Capillary refill about 3 seconds." : "Capillary refill under 2 seconds."]);
+    else if (id === "walk_out") { SIM.F.walked = m0; lines.push(["", dxr]); alert = P_ALERT_WALK.includes(SIM.sc); }
     else if (Array.isArray(dxr)) lines = (s.confused(st) && dxr[0][0] === "Patient") ? [["Patient","(does not answer appropriately)"]] : dxr;
     else lines.push(["", dxr]);
     entry.s = snap(st);
@@ -1408,7 +1495,7 @@ document.addEventListener("change", e => {
 /* ---------- start screen ---------- */
 let pick = null;
 /* Call codes are stored hashed so they can't be read from the page source. Codes: see instructor notes. */
-const CODE_HASH = { "748ff6b1":"ams", "e5b4e465":"cp", "5ab06816":"fall" };
+const CODE_HASH = { "748ff6b1":"ams", "e5b4e465":"cp", "5ab06816":"fall", "75ccef53":"toe" };
 function codeToScenario(code){ const c = String(code||"").trim().toUpperCase().replace(/\s+/g,""); return c ? CODE_HASH[fnv("epcr|" + c)] || null : null; }
 function renderStart(){
   const sidNow = $("#s_id").value.trim();
