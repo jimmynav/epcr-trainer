@@ -824,6 +824,98 @@ toe: {
     return null;
   },
   events:[]
+},
+
+/* ----------------------------------------------------------------- BAR */
+bar: {
+  id:"bar", code:"3", nature:"Assault – head injury",
+  incident:"26-108125", unit:"M-62 (BLS)", address:"The Bussin' Bassil Bar, 418 E Orchard Ave (bar)", caller:"Bartender",
+  notes:"24 y/o M struck in head with a glass. Bleeding from head. Conscious. Suspect fled on foot; may still be in the area. PD not yet on scene.",
+  cad:{ psap:"23:14:36", disp:"23:15:20", enroute:"23:15:48", onscene:"23:21:05" },
+  triageRN:"Isabel Ibarra, RN", pdArrives:240,
+  dx:{
+    req_pd:"Dispatch: \"Copy. PD en route, ETA 4 minutes.\"",
+    stage:() => SIM.pdReqT != null ? "You stage down the block until PD arrives and clears the scene." : "You stage down the block. Dispatch: \"PD isn't assigned yet. Request them if you need them.\"",
+    ask_etoh:[["Patient","Four or five beers. No drugs."]], ask_tetanus:[["Patient","I don't know."]], ask_preg:[["Patient","What? No."]],
+    ask_travel:[["Patient","No."]], ask_polst:[["Patient","A what? No."]],
+    walk_out:"He stands up, wobbles, and his friend catches him before he goes down."
+  },
+  ptHeader:"Young adult male",
+  scene:"Busy bar, music still playing. A bouncer waves you in. The patient is sitting on a barstool holding a bloody bar towel to the right side of his head. Broken glass on the floor.",
+  sceneSafe:"The bouncer says the suspect ran out the back a few minutes ago. Crowd is tense but calm. Broken glass on the floor near the patient; watch your footing.",
+  numPts:"One patient.",
+  moi:"Mechanism: struck on the right side of the head with a heavy glass beer mug. Fell from standing per witnesses.",
+  noi:"No medical complaint apparent. This is an assault with injury.",
+  ccLt:"Chief complaint: head injury after being struck with a glass mug. Scalp bleeding is the only immediate concern.",
+  smr:"Blunt head trauma in an intoxicated patient: unreliable exam, so spinal motion restriction is indicated.",
+  bleed:"Scalp laceration oozing steadily through the bar towel. Not spurting. Controllable with direct pressure.",
+  airwayAtRisk(m, F){
+    if (F.vomitM === undefined || m < F.vomitM) return false;
+    const flat = firstTx(F, ["collar","lsb","vacuum"]);
+    if (flat === null || flat > F.vomitM) return false;
+    const cleared = F.tx.some(x => (x.id === "suction" || x.id === "pos_recovery") && x.m >= F.vomitM);
+    return !cleared;
+  },
+  compute(m, F){
+    let pain = 7;
+    const cp = firstTx(F, "cold_pack"); if (cp !== null && m >= cp + 2) pain -= 1;
+    const risk = this.airwayAtRisk(m, F);
+    const o2 = o2At(F, m);
+    let spo2 = o2 === "nc" ? 99 : o2 === "nrm" ? 100 : 98;
+    if (risk) spo2 = o2 ? 95 : 92;
+    return { hr: risk ? 112 : 104, sbp:138, dbp:84, rr: risk ? 22 : 18, spo2, bgl:96, E:4, V:4, M:6, swallow:true, pain,
+      temp:98.6, tempRoute:"oral", skin:"pink, warm, dry", pulseQ:"regular, strong", pupils:"PERRL, 4 mm, brisk", lungs: risk ? "Coarse sounds in the upper airway." : "Clear and equal bilaterally.", risk };
+  },
+  present(S){
+    if (S.risk) return "Patient is gurgling, with vomit at the corner of his mouth.";
+    if (firstTx(SIM.F, ["collar","lsb","vacuum"]) !== null) return "Patient is secured supine with a cervical collar, asking again what happened.";
+    return "24 y/o male sitting on a barstool holding a blood-soaked towel to the right side of his head. Slurred speech, asking what happened. Odor of an alcoholic beverage.";
+  },
+  confused: () => false,
+  primary:{
+    gen_imp:"Young adult male with a bleeding head wound, sitting up against the bar.",
+    airway:S => S.risk ? "Gurgling. Vomit in the mouth. Airway at risk." : "Patent. No secretions or abnormal airway sounds. Speaking in full sentences, slightly slurred.",
+    breathing:S => S.risk ? `Rate ${S.rr}, ${rateWord(S.rr)}. Rhythm regular. Labored, gurgling. Chest rise equal bilaterally, shallow.` : `Rate ${S.rr}, ${rateWord(S.rr)}. Rhythm regular. Unlabored. Chest rise equal bilaterally, adequate depth; no paradoxical movement.`,
+    swallow:"Gag intact; swallows normally."
+  },
+  ask(id, S){
+    if (S.risk) return PT("(gurgling, can't answer)");
+    const p = {
+      ask_cc:"My head is killing me. What happened?",
+      ask_id:"Spencer Smith, last name S-M-I-T-H. March 2nd, 2002. About 80 kilograms.",
+      ask_o:"I don't know... it just started hurting. All at once, I guess.",
+      ask_p:"Light makes it worse. Nothing makes it better.", ask_q:"Pounding.",
+      ask_r:"Right side of my head. The whole head, kind of.", ask_s:`${S.pain} out of 10.`,
+      ask_signs:"My head hurts and I feel like I'm going to throw up. I threw up in the bathroom already.",
+      ask_allergies:"No.", ask_meds:"None.", ask_pmh:"Nothing. I'm healthy.",
+      ask_intake:"Wings around 9, and... four beers? Maybe five.",
+      ask_events:"I was talking to this girl at the bar... then I'm on the floor. I don't remember getting hit. Wait, what happened?",
+      ask_loc:"No, I didn't pass out.", ask_neckpain:"No... I don't think so.", ask_anticoag:"No.", ask_pde5:"No."
+    };
+    if (id === "ask_t") return [["Patient","I don't know. Danny, what time was it?"],["Friend","Like 11:10."]];
+    if (id === "ask_bystander") return [["Friend (Danny)","That guy hit him with a beer mug, right on the side of the head. Spencer went down and was out for like ten seconds. He's been asking the same questions over and over."]];
+    return PT(p[id] || "No.");
+  },
+  exam:{
+    ex_head:"4 cm laceration, right parietal scalp, with surrounding swelling, oozing. No depression or crepitus. No bruising behind the ears or around the eyes. No fluid from the ears or nose.",
+    ex_neck:"Patient denies neck pain. No obvious midline tenderness, but he is intoxicated and confused, so the exam is unreliable.",
+    ex_ue:"Small cuts on the right hand from broken glass, not bleeding.",
+    ex_pms:"Pulse, motor, and sensation intact in all four extremities.",
+    ex_stroke:"No facial droop or arm drift. Speech slightly slurred."
+  },
+  onTreat(id){
+    if (id === "bleeding") return { text:"Direct pressure and a pressure dressing applied to the scalp. Bleeding controlled." };
+    if (id === "oral_glucose") return { text:"He swallows the gel. No change." };
+    if (id === "suction") return { text:"Airway suctioned. Vomit cleared." };
+    return null;
+  },
+  events:[
+    { id:"vomit", when:(m) => m >= 15, onFire:(F, m) => { F.vomitM = m; },
+      text:(F) => firstTx(F, ["collar","lsb","vacuum"]) !== null
+        ? "Patient vomits while secured flat in the collar. Gurgling in his airway."
+        : "Patient leans forward and vomits on the floor.",
+      alert:true }
+  ]
 }
 };
 
@@ -968,7 +1060,9 @@ function doAction(id, param){
   const entry = { t:t0, a:id };
   let lines = [], alert = false;
 
-  const dxr = (s.dx && s.dx[id]) || (a.group !== "treat" ? DX[id] : null);
+  let dxr = (s.dx && s.dx[id]) || (a.group !== "treat" ? DX[id] : null);
+  if (typeof dxr === "function") dxr = dxr(st);
+  if (id === "req_pd" && s.pdArrives && SIM.pdReqT == null) SIM.pdReqT = t0;
   if (dxr && a.group !== "treat") {
     if (id === "cap_refill") lines.push(["", /cool|cold/.test(st.skin) ? "Capillary refill about 3 seconds." : "Capillary refill under 2 seconds."]);
     else if (id === "walk_out") { SIM.F.walked = m0; lines.push(["", dxr]); alert = P_ALERT_WALK.includes(SIM.sc); }
@@ -1059,11 +1153,21 @@ function doAction(id, param){
 }
 
 function afterAdvance(){
+  const s = sc();
+  if (s.pdArrives && SIM.pdReqT != null && !SIM.fired.pdarrive && SIM.t >= SIM.pdReqT + s.pdArrives) {
+    const at = SIM.pdReqT + s.pdArrives;
+    SIM.fired.pdarrive = at; addFeed(at, "sys", null, "PD arrives and secures the scene."); SIM.log.push({ t:at, a:"ev_pdarrive" });
+  }
   if (SIM.contactT === null) return;
-  const s = sc(), m = mNow(), st = S();
+  const m = mNow();
   for (const ev of s.events || []) {
     if (SIM.fired[ev.id]) continue;
-    if (ev.when(m, st, SIM.F)) { SIM.fired[ev.id] = SIM.t; addFeed(SIM.t, "sys", null, esc(ev.text), ev.alert); SIM.log.push({ t:SIM.t, a:"ev_"+ev.id }); }
+    const st = S();
+    if (ev.when(m, st, SIM.F)) {
+      SIM.fired[ev.id] = SIM.t; if (ev.onFire) ev.onFire(SIM.F, m);
+      const txt = typeof ev.text === "function" ? ev.text(SIM.F, st) : ev.text;
+      addFeed(SIM.t, "sys", null, esc(txt), ev.alert); SIM.log.push({ t:SIM.t, a:"ev_"+ev.id });
+    }
   }
 }
 
@@ -1513,7 +1617,7 @@ document.addEventListener("change", e => {
 /* ---------- start screen ---------- */
 let pick = null;
 /* Call codes are stored hashed so they can't be read from the page source. Codes: see instructor notes. */
-const CODE_HASH = { "748ff6b1":"ams", "e5b4e465":"cp", "5ab06816":"fall", "75ccef53":"toe" };
+const CODE_HASH = { "748ff6b1":"ams", "e5b4e465":"cp", "5ab06816":"fall", "75ccef53":"toe", "05d0faef":"bar" };
 function codeToScenario(code){ const c = String(code||"").trim().toUpperCase().replace(/\s+/g,""); return c ? CODE_HASH[fnv("epcr|" + c)] || null : null; }
 function renderStart(){
   const sidNow = $("#s_id").value.trim();
