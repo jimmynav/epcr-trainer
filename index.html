@@ -468,6 +468,7 @@ const DX = {
    SCENARIOS (physiology + scripted findings). No grading here.
    compute(m, F): patient state at m minutes after contact, given flags F.
    ===================================================================== */
+function rateWord(rr){ return rr < 12 ? "slow" : rr > 20 ? "fast" : "normal"; }
 function txAt(F, id){ return F.tx.filter(x => x.id === id); }
 function firstTx(F, ids){ ids = [].concat(ids); const l = F.tx.filter(x => ids.includes(x.id)); return l.length ? l[0].m : null; }
 function o2At(F, m){ // current O2 mode at minute m
@@ -528,9 +529,9 @@ ams: {
   },
   confused: S => S.V < 5,
   primary:{
-    gen_imp:"Adult female, looks ill. Altered and diaphoretic. Airway open, breathing adequately. No obvious trauma.",
+    gen_imp:"Middle-aged female sitting on the living room couch.",
     airway:S => S.swallow ? "Patent. No secretions. No abnormal airway sounds. Speaking in short, confused phrases, not full sentences." : "Snoring respirations with secretions pooling in the mouth. Not phonating; only moans. Airway at risk.",
-    breathing:S => `RR ${S.rr}, adequate depth, unlabored.`,
+    breathing:S => S.E < 4 ? `Rate ${S.rr}, ${rateWord(S.rr)}. Rhythm regular. Snoring, mildly labored. Chest rise equal bilaterally but shallow.` : `Rate ${S.rr}, ${rateWord(S.rr)}. Rhythm regular. Unlabored. Chest rise equal bilaterally, adequate depth.`,
     swallow:S => S.swallow ? "Gag reflex intact. Patient swallows on command." : "Patient cannot follow the command to swallow; weak gag. Not safe for anything by mouth."
   },
   ask(id, S){
@@ -630,8 +631,8 @@ cp: {
   },
   confused: S => S.V < 5,
   primary:{
-    gen_imp:"Adult male in moderate distress. Pale and diaphoretic. Airway open; breathing slightly fast.",
-    airway:S => S.V < 5 ? "Patent. No secretions or abnormal airway sounds. Speaking in short phrases only." : "Patent. No secretions or abnormal airway sounds. Speaking in full, complete sentences.", breathing:S => `RR ${S.rr}, mildly labored, equal chest rise.`, swallow:"Gag intact; swallows normally."
+    gen_imp:"Older adult male sitting on the front porch steps, holding his chest.",
+    airway:S => S.V < 5 ? "Patent. No secretions or abnormal airway sounds. Speaking in short phrases only." : "Patent. No secretions or abnormal airway sounds. Speaking in full, complete sentences.", breathing:S => `Rate ${S.rr}, ${rateWord(S.rr)}. Rhythm regular. Mildly labored. Chest rise equal bilaterally, adequate depth; no paradoxical movement.`, swallow:"Gag intact; swallows normally."
   },
   ask(id, S){
     const p = {
@@ -698,12 +699,12 @@ fall: {
   },
   present(S){
     if (S.pain >= 10) return "Patient is crying out in pain, gripping the floor.";
-    return "81 y/o female lying on her left side on the kitchen floor, alert, grimacing, guarding her right hip. The right leg looks shorter than the left and the foot is turned outward.";
+    return "81 y/o female lying on her left side on the kitchen floor, grimacing, guarding her right hip. The right leg looks shorter than the left and the foot is turned outward.";
   },
   confused: () => false,
   primary:{
-    gen_imp:"Elderly female in moderate distress from pain. Alert. Airway open. No obvious bleeding.",
-    airway:"Patent. No secretions or abnormal airway sounds. Speaking in full, complete sentences.", breathing:S => `RR ${S.rr}, unlabored.`, swallow:"Gag intact; swallows normally."
+    gen_imp:"Elderly female lying on her left side on the kitchen floor.",
+    airway:"Patent. No secretions or abnormal airway sounds. Speaking in full, complete sentences.", breathing:S => `Rate ${S.rr}, ${rateWord(S.rr)}. Rhythm regular. Unlabored. Chest rise equal bilaterally, adequate depth.`, swallow:"Gag intact; swallows normally."
   },
   ask(id, S){
     const p = {
@@ -786,9 +787,9 @@ toe: {
   },
   confused: () => false,
   primary:{
-    gen_imp:"Adult male in mild distress from foot pain. Alert. No obvious life threats.",
+    gen_imp:"Middle-aged male sitting on the living room couch, holding his right foot.",
     airway:"Patent. No secretions or abnormal airway sounds. Speaking in full, complete sentences.",
-    breathing:S => `RR ${S.rr}, unlabored.`, swallow:"Gag intact; swallows normally."
+    breathing:S => `Rate ${S.rr}, ${rateWord(S.rr)}. Rhythm regular. Unlabored. Chest rise equal bilaterally, adequate depth.`, swallow:"Gag intact; swallows normally."
   },
   ask(id, S){
     const p = {
