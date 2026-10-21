@@ -859,6 +859,7 @@ function allowed(a){
 function doAction(id, param){
   const a = ACT[id]; if (!a || !allowed(a)) return;
   if (id === "begin_transport" && !param) return transportModal();
+  if (id === "transfer" && param !== "force" && vitalsTaken() < 3) return vitalsWarnModal();
   const s = sc(), t0 = SIM.t, m0 = mNow(), st = S();
   const entry = { t:t0, a:id };
   let lines = [], alert = false;
@@ -1171,7 +1172,7 @@ function sectHTML(id){
 function missingFor(sec){
   const miss = [];
   for (const k of REQ[sec] || []) if (!String(fv(k)).trim()) miss.push(k);
-  if (sec === "vitals" && FORM.vitals.length === 0) miss.push("vitals");
+  if (sec === "vitals" && FORM.vitals.length < vitalsNeeded()) miss.push("vitals");
   if (sec === "tx" && false) miss.push("tx");
   return miss;
 }
@@ -1203,7 +1204,8 @@ function finalHTML(){
   return `
     <h2>Finalize</h2><p class="hint">Fix every required item, then generate your PCR and save it as a PDF.</p>
     ${done ? "" : `<div class="note">The call isn't over yet. Transport the patient and transfer care before you finalize.</div>`}
-    <ul class="valist">${miss.length ? miss.map(([s,f]) => `<li class="miss">Missing: ${esc(f === "vitals" ? "At least one set of vital signs" : FLABEL[f] || f)}<button data-goto="${s}">Go to</button></li>`).join("")
+    ${done && vitalsTaken() < 3 ? `<div class="note">You took ${vitalsTaken()} set${vitalsTaken() === 1 ? "" : "s"} of vital signs on this call. At least 3 are required, and this will count against you. Chart only the sets you actually took.</div>` : ""}
+    <ul class="valist">${miss.length ? miss.map(([s,f]) => `<li class="miss">Missing: ${esc(f === "vitals" ? `At least ${vitalsNeeded()} sets of vital signs (${FORM.vitals.length} charted)` : FLABEL[f] || f)}<button data-goto="${s}">Go to</button></li>`).join("")
       : `<li class="ok">All required fields are complete.</li>`}</ul>
     <div class="note info">The validation check only confirms required fields are filled in. It does not check whether your chart is accurate.</div>
     <div class="rowbtns">
@@ -1345,6 +1347,16 @@ function transportModal(){
     if (!dest || !pr) { toast("Choose a destination and a priority."); return; }
     root.innerHTML = ""; doAction("begin_transport", { dest, pr });
   };
+}
+function vitalsTaken(){ return SIM ? SIM.log.filter(l => l.a === "v_set").length : 0; }
+function vitalsNeeded(){ return Math.min(3, vitalsTaken()); }
+function vitalsWarnModal(){
+  const root = $("#modalRoot"), n = vitalsTaken();
+  root.innerHTML = `<div class="scrim"><div class="modal" role="dialog" aria-modal="true"><h3>Only ${n} set${n === 1 ? "" : "s"} of vital signs</h3>
+    <p style="margin:0 0 14px">At least 3 full sets of vital signs are required before you transfer care. Take another set now?</p>
+    <div class="rowbtns" style="justify-content:flex-end"><button class="btn" id="vw_go">Transfer anyway</button><button class="btn primary" id="vw_v">Take vitals now</button></div></div></div>`;
+  $("#vw_v").onclick = () => { root.innerHTML = ""; curGroup = "vitals"; doAction("v_set"); };
+  $("#vw_go").onclick = () => { root.innerHTML = ""; doAction("transfer", "force"); };
 }
 function confirmModal(title, body, okLabel, onOk){
   const root = $("#modalRoot");
