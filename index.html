@@ -481,6 +481,20 @@ const SAY = {
   bar: S => S.risk ? ["Patient","(gurgling, can't answer)"] : ["Patient","My head still hurts... wait, what happened?"],
   ana: S => S.V < 5 ? ["Patient","(restless, can't get words out)"] : !S.res ? ["Patient","Still tight... hard to breathe."] : ["Patient","I can breathe so much better."]
 };
+/* Receiving nurses: one is picked at random for each student's call and stays fixed for that call */
+const NURSES = ["Jimmy Nguyen","Theresa Nguyen","Bassil Dakelbab","Spencer Manning","Vincent Hugee","Hayden Micheal","Hank Harris","Isabel Ibarbia","Brian Mojica"];
+const PT_NAMES = { ams:"Linda Okafor", cp:"Daniel Whitaker", fall:"Margaret Ellison", toe:"Robert Delgado", bar:"Spencer Smith", ana:"Isabel Ibarbia" };
+function currentRN(){
+  if (!SIM.rn) {
+    if (SIM.log.some(l => l.a === "arrive")) SIM.rn = sc().triageRN;   /* a call already at the hospital keeps the nurse it met */
+    else {
+      if (!SIM.seed) SIM.seed = Math.random().toString(36).slice(2);
+      const pool = NURSES.filter(n => n !== PT_NAMES[SIM.sc]);
+      SIM.rn = pool[Math.floor(seededRand(SIM.seed + "|rn")() * pool.length)] + ", RN";
+    }
+  }
+  return SIM.rn;
+}
 function rateWord(rr){ return rr < 12 ? "slow" : rr > 20 ? "fast" : "normal"; }
 function txAt(F, id){ return F.tx.filter(x => x.id === id); }
 function firstTx(F, ids){ ids = [].concat(ids); const l = F.tx.filter(x => ids.includes(x.id)); return l.length ? l[0].m : null; }
@@ -1287,9 +1301,9 @@ function doAction(id, param){
   } else if (id === "arrive") {
     SIM.t = Math.max(SIM.t, SIM.etaT);
     entry.t = SIM.t; SIM.phase = "arrived";
-    lines.push(["", `Arrived at ${esc(HOSP[SIM.dest].name)}. Triage nurse: <b>${esc(s.triageRN)}</b>.`]);
+    lines.push(["", `Arrived at ${esc(HOSP[SIM.dest].name)}. Triage nurse: <b>${esc(currentRN())}</b>.`]);
   } else if (id === "transfer") {
-    lines.push(["", `Verbal report given and care transferred to ${esc(s.triageRN)}. Patient moved to ED bed.`]);
+    lines.push(["", `Verbal report given and care transferred to ${esc(currentRN())}. Patient moved to ED bed.`]);
     SIM.log.push(entry);
     addFeed(t0, "act", a.label, lines.map(l=>l[1]).join(" "));
     SIM.t = t0 + a.cost; SIM.phase = "done";
@@ -1584,7 +1598,7 @@ function fnv(str){ let h = 0x811c9dc5; for (let i=0;i<str.length;i++){ h ^= str.
 function b64url(bytes){ let s=""; for (let i=0;i<bytes.length;i+=0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i,i+0x8000)); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
 async function buildCode(){
   const payload = { v:VERSION, sc:SIM.sc, st:SIM.student, at:SIM.attempt, t0:SIM.startedAt, t1:new Date().toISOString(),
-    contact:SIM.contactT, dest:SIM.dest, pr:SIM.priority, dep:SIM.departT, log:SIM.log, form:FORM };
+    contact:SIM.contactT, rn:currentRN(), dest:SIM.dest, pr:SIM.priority, dep:SIM.departT, log:SIM.log, form:FORM };
   const json = JSON.stringify(payload);
   const chk = fnv(json);
   const raw = new TextEncoder().encode(json);
