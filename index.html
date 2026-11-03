@@ -338,7 +338,8 @@ const ACTIONS = [
   ["exam","ex_back","Back / posterior",30],
   ["exam","ex_ue","Upper extremities",30],
   ["exam","ex_le","Lower extremities",30],
-  ["exam","ex_pms","Distal pulse / motor / sensation",45],
+  ["exam","ex_pms_ue","Distal PMS/CMS – upper extremities",30],
+  ["exam","ex_pms_le","Distal PMS/CMS – lower extremities",30],
   ["exam","ex_pupils","Pupils",15],
   ["exam","ex_lungs","Auscultate lung sounds",30],
   ["exam","ex_stroke","Stroke screen (BE-FAST)",60],
@@ -584,7 +585,8 @@ ams: {
   exam:{
     ex_head:"Atraumatic. No signs of injury.", ex_neck:"No JVD, trachea midline, no tenderness.", ex_chest:"Symmetrical rise, no trauma.",
     ex_abd:"Soft, non-tender.", ex_pelvis:"Stable, non-tender.", ex_back:"No deformity or tenderness.", ex_ue:"No deformity. Moves both arms.", ex_le:"No deformity, no edema. Moves both legs.",
-    ex_pms:"Distal pulses, motor, and sensation intact in all four extremities.",
+    ex_pms_ue:"Radial pulses present and equal. Grips equal. Sensation intact in both hands.",
+    ex_pms_le:"Pedal pulses present and equal. Wiggles toes on command. Sensation intact in both feet.",
     ex_stroke:S => S.V < 5 ? "Balance: not tested (seated). Eyes: normal. Face: no droop. Arms: no drift. Speech: slurred and confused." : "Negative: no facial droop, no arm drift, speech clear."
   },
   onTreat(id, S){
@@ -665,7 +667,8 @@ cp: {
   exam:{
     ex_head:"Atraumatic.", ex_neck:"No JVD. Trachea midline.", ex_chest:"No trauma; equal rise. Patient points to the center of his chest.",
     ex_abd:"Soft, non-tender.", ex_pelvis:"Stable.", ex_back:"No tenderness.", ex_ue:"No deformity.", ex_le:"No pedal edema. No deformity.",
-    ex_pms:"Distal pulses, motor, and sensation intact ×4.", ex_stroke:"Negative: no facial droop, no arm drift, speech clear."
+    ex_pms_ue:"Radial pulses present and equal. Grips equal. Sensation intact in both hands.",
+    ex_pms_le:"Pedal pulses present and equal. Wiggles toes. Sensation intact in both feet. No pedal edema.", ex_stroke:"Negative: no facial droop, no arm drift, speech clear."
   },
   onTreat(id){
     if (id === "aspirin") return { text:"Patient chews 4 × 81 mg baby aspirin (324 mg)." };
@@ -741,7 +744,8 @@ fall: {
     ex_back:"No midline tenderness. Sacral skin intact.",
     ex_ue:"2 cm skin tear, right forearm; bleeding controlled. No deformity.",
     ex_le:"Right leg shortened and externally rotated. Tender right hip and groin. No open wounds. Left leg normal.",
-    ex_pms:S => S.pmsBad ? "RIGHT foot pale and cool; pedal pulse weak; patient reports tingling in the toes. Left: pulse, motor, sensation intact." : "Pedal pulses present bilaterally. Sensation intact. Wiggles toes. Cap refill under 2 seconds.",
+    ex_pms_ue:"Radial pulses present, irregular. Grips equal. Sensation intact in both hands. (Skin tear on the right forearm.)",
+    ex_pms_le:S => S.pmsBad ? "RIGHT foot pale and cool; pedal pulse weak; patient reports tingling in the toes. Left: pulse, motor, sensation intact." : "Pedal pulses present bilaterally. Sensation intact. Wiggles toes. Cap refill under 2 seconds.",
     ex_stroke:"Negative: no facial droop, no arm drift, speech clear (gait not tested)."
   },
   onTreat(id){
@@ -823,7 +827,8 @@ toe: {
   exam:{
     ex_head:"Atraumatic.", ex_neck:"No midline tenderness. Full range of motion without pain.",
     ex_le:"Right great toe swollen with bruising at the base. Tender to touch. No deformity, no open wound. Left foot normal.",
-    ex_pms:"Right foot: pedal pulse present, cap refill under 2 seconds, sensation intact, can wiggle the toes (painful). Left foot normal.",
+    ex_pms_ue:"Radial pulses present and equal. Grips equal. Sensation intact in both hands.",
+    ex_pms_le:"Right foot: pedal pulse present, cap refill under 2 seconds, sensation intact, can wiggle the toes (painful). Left foot normal.",
     ex_stroke:"Negative: no facial droop, no arm drift, speech clear."
   },
   onTreat(id){
@@ -938,7 +943,8 @@ ana: {
     ex_chest:"Hives across the chest. Accessory muscle use.",
     ex_abd:"Soft. She says she feels a little nauseated.",
     ex_ue:"Raised hives on both arms.", ex_le:"Raised hives on both thighs.",
-    ex_pms:"Pulse, motor, and sensation intact in all four extremities.",
+    ex_pms_ue:"Radial pulses present and equal. Grips equal. Sensation intact in both hands.",
+    ex_pms_le:"Pedal pulses present and equal. Wiggles toes. Sensation intact in both feet.",
     ex_stroke:"No facial droop or arm drift. Speech hoarse but clear."
   },
   onTreat(id, S, F){
@@ -1031,7 +1037,8 @@ bar: {
     ex_head:"4 cm laceration, right parietal scalp, with surrounding swelling, oozing. No depression or crepitus. No bruising behind the ears or around the eyes. No fluid from the ears or nose.",
     ex_neck:"Patient denies neck pain. No obvious midline tenderness, but he is intoxicated and confused, so the exam is unreliable.",
     ex_ue:"Small cuts on the right hand from broken glass, not bleeding.",
-    ex_pms:"Pulse, motor, and sensation intact in all four extremities.",
+    ex_pms_ue:"Radial pulses present and equal. Grips equal. Sensation intact in both hands.",
+    ex_pms_le:"Pedal pulses present and equal. Wiggles toes. Sensation intact in both feet.",
     ex_stroke:"No facial droop or arm drift. Speech slightly slurred."
   },
   onTreat(id){
@@ -1242,6 +1249,8 @@ function doAction(id, param){
     entry.s = snap(st);
   } else if (a.group === "exam") {
     let r = s.exam[id];
+    if (!r && id === "ex_pms_ue") r = "Radial pulses present and equal. Grips equal. Sensation intact in both hands.";
+    if (!r && id === "ex_pms_le") r = "Pedal pulses present and equal. Wiggles toes. Sensation intact in both feet.";
     if (id === "ex_pupils") r = st.pupils;
     if (id === "ex_lungs") r = st.lungs;
     if (typeof r === "function") r = r(st);
@@ -1369,7 +1378,7 @@ function renderLeft(){
    ===================================================================== */
 const IMPRESSIONS = ["","Abdominal pain","Allergic reaction","Altered mental status","Behavioral/psychiatric","Cardiac arrest","Chest pain – suspected cardiac","Chest pain – non-cardiac","Diabetic – hypoglycemia","Diabetic – hyperglycemia","Fall","General weakness","Head injury","Hip injury – suspected fracture","Hypotension","Overdose/poisoning","Respiratory distress","Seizure","Stroke/CVA","Syncope","Trauma – extremity","Other"];
 const PMH = ["Diabetes","Hypertension","Cardiac / MI","Stent / CABG","CHF","Atrial fibrillation","Hyperlipidemia","COPD / asthma","Stroke / TIA","Seizure disorder","Osteoporosis","Renal disease"];
-const EXAM = [["head","Head / face"],["neck","Neck / C-spine"],["chest","Chest"],["abd","Abdomen"],["pelvis","Pelvis"],["back","Back"],["ue","Upper extremities"],["le","Lower extremities"],["pms","Distal PMS"],["neuro","Neuro / stroke screen"]];
+const EXAM = [["head","Head / face"],["neck","Neck / C-spine"],["chest","Chest"],["abd","Abdomen"],["pelvis","Pelvis"],["back","Back"],["ue","Upper extremities"],["le","Lower extremities"],["pmsue","Distal PMS/CMS – upper"],["pmsle","Distal PMS/CMS – lower"],["neuro","Neuro / stroke screen"]];
 const SECTS = [
   ["incident","Incident & times"],["patient","Patient"],["history","Complaint & history"],["assess","Assessment"],
   ["vitals","Vitals"],["tx","Treatments"],["narr","Narrative"],["disp","Disposition"],["final","Finalize"]
