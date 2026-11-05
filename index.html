@@ -330,6 +330,8 @@ const ACTIONS = [
   ["history","ask_anticoag","Taking blood thinners?",10],
   ["history","ask_pde5","Erectile dysfunction meds (Viagra, Cialis) in last 48 h?",10],
   ["history","ask_bystander","Talk to family / bystander",30],
+  ["history","ask_private","Speak with patient privately",30],
+  ["history","ask_safe","Do you feel safe at home?",15],
   ["exam","ex_head","Head / scalp / face",30],
   ["exam","ex_neck","Neck / C-spine",30],
   ["exam","ex_chest","Chest",30],
@@ -404,6 +406,7 @@ const ACTIONS = [
   ["treat","reassess","Reassess patient (response to treatment)",30],
   ["treat","check_med","Check medication (name, dose, expiration)",20],
   ["treat","toe_splint","Splint toe (buddy tape)",120],
+  ["treat","splint_ue","Splint upper extremity (wrist / forearm)",120],
   ["treat","elevate","Elevate extremity",20],
   ["treat","asa81","Aspirin 81 mg PO",30],
   ["treat","charcoal","Activated charcoal 50 g PO",60],
@@ -424,9 +427,9 @@ const ACT = Object.fromEntries(ACTIONS.map(a => [a[1], {group:a[0], id:a[1], lab
 
 /* Treatment choices for the chart (same ids as the actions) */
 const TX_IDS = ["o2_nc","o2_nrm","bvm","opa","npa","suction","pos_semi","pos_recovery","pos_supine","oral_glucose","aspirin","nitro","naloxone","epi","albuterol","collar","hip_pad","traction","realign","scoop","vacuum","cold_pack","blanket","bleeding",
-  "toe_splint","elevate","c_shock","asa81","charcoal","tourniquet","pelvic_binder","lsb","ked","sling","hot_pack","trendelenburg","paper_bag"];
+  "toe_splint","splint_ue","elevate","c_shock","asa81","charcoal","tourniquet","pelvic_binder","lsb","ked","sling","hot_pack","trendelenburg","paper_bag"];
 const TX_LABEL = {
-  c_shock:"Shock management (position, warmth)", toe_splint:"Splint – toe (buddy tape)", elevate:"Elevation of extremity",
+  c_shock:"Shock management (position, warmth)", toe_splint:"Splint – toe (buddy tape)", splint_ue:"Splint – wrist / forearm", elevate:"Elevation of extremity",
   asa81:"Aspirin 81 mg", charcoal:"Activated charcoal", tourniquet:"Tourniquet", pelvic_binder:"Pelvic binder", lsb:"Long spine board", ked:"KED",
   sling:"Sling & swathe", hot_pack:"Hot pack", trendelenburg:"Positioning – Trendelenburg", paper_bag:"Paper bag breathing",
   o2_nc:"Oxygen – nasal cannula", o2_nrm:"Oxygen – non-rebreather mask", bvm:"BVM ventilation", opa:"OPA", npa:"NPA", suction:"Suction",
@@ -446,12 +449,13 @@ const TX_RESP = {
   traction:"Traction splint applied.", realign:"You attempt to straighten the extremity.",
   asa81:"Patient chews one 81 mg aspirin.", charcoal:"Patient drinks the charcoal slurry.", tourniquet:"Tourniquet applied and tightened.",
   pelvic_binder:"Pelvic binder applied and tightened.", lsb:"Patient log-rolled and secured to a long spine board.", ked:"KED applied.",
-  toe_splint:"Injured toe padded and buddy-taped to the adjacent toe.", elevate:"Extremity elevated on pillows.",
+  toe_splint:"Injured toe padded and buddy-taped to the adjacent toe.", splint_ue:"Wrist and forearm splinted in position of function, padded, with a sling.", elevate:"Extremity elevated on pillows.",
   sling:"Sling and swathe applied.", hot_pack:"Hot pack applied.", trendelenburg:"Patient placed supine with legs elevated.", paper_bag:"Patient coached to breathe into a paper bag."
 };
 const P_ALERT_WALK = ["toe","fall","ams","cp"];
 /* Responses for look-alike options that aren't in the treat group. Scenario files can override with s.dx[id]. */
 const DX = {
+  ask_private:[["Patient","There's nothing else to tell you."]], ask_safe:[["Patient","Yes."]],
   req_pd:"Dispatch: \"Copy. PD en route, ETA 15 minutes.\"",
   stage:"You stage around the corner. After 5 minutes dispatch advises: \"Scene was reported safe; no PD assigned.\" You proceed in.",
   req_fire:"Dispatch: \"Copy. Engine responding, ETA 8 minutes.\"",
@@ -483,7 +487,7 @@ const SAY = {
 };
 /* Receiving nurses: one is picked at random for each student's call and stays fixed for that call */
 const NURSES = ["Jimmy Nguyen","Theresa Nguyen","Bassil Dakelbab","Spencer Manning","Vincent Hugee","Hayden Micheal","Hank Harris","Isabel Ibarbia","Brian Mojica"];
-const PT_NAMES = { ams:"Linda Okafor", cp:"Daniel Whitaker", fall:"Margaret Ellison", toe:"Robert Delgado", bar:"Spencer Smith", ana:"Isabel Ibarbia" };
+const PT_NAMES = { ams:"Linda Okafor", cp:"Daniel Whitaker", fall:"Margaret Ellison", toe:"Robert Delgado", bar:"Spencer Smith", ana:"Isabel Ibarbia", dv:"Danielle Reyes" };
 function currentRN(){
   if (!SIM.rn) {
     if (SIM.log.some(l => l.a === "arrive")) SIM.rn = sc().triageRN;   /* a call already at the hospital keeps the nurse it met */
@@ -977,6 +981,112 @@ ana: {
   ]
 },
 
+/* ----------------------------------------------------------------- DV */
+dv: {
+  id:"dv", code:"2", nature:"Injured person – face pain",
+  incident:"26-109334", unit:"M-62 (BLS)", address:"2740 N Cambridge Ave, Apt 12 (residence)", caller:"Neighbor",
+  notes:"31 y/o F face injury. Neighbor heard yelling and something breaking. Conscious, breathing.",
+  cad:{ psap:"21:47:22", disp:"21:48:05", enroute:"21:48:40", onscene:"21:55:18" },
+  triageRN:"Jimmy Nguyen, RN", pdArrives:300, handles:["ask_private","ask_safe"],
+  dx:{
+    req_pd:"Dispatch: \"Copy. PD en route, ETA 5 minutes.\"",
+    stage:() => SIM.pdReqT != null ? "You wait in the hallway until PD arrives and separates the partner." : "You wait in the hallway. Dispatch: \"PD isn't assigned yet. Request them if you need them.\"",
+    collar:"Cervical collar applied. Patient: \"It's pressing on my throat. It hurts.\"",
+    ask_etoh:[["Patient","No. I don't drink."]], ask_tetanus:[["Patient","A couple of years ago, I think."]], ask_preg:[["Patient","No."]],
+    walk_out:"She walks to the ambulance holding her left wrist against her chest."
+  },
+  ptHeader:"Young adult female",
+  scene:"Second-floor apartment. A man opens the door partway and stands in the doorway. Behind him, a broken lamp on the floor. A woman is sitting on the couch holding a bag of frozen peas to her face.",
+  sceneSafe:"The man (partner, \"Marcus\") is tense and blocking the doorway: \"She fell. She's fine. We don't need you.\" He's not holding anything, but he's agitated. Broken glass from the lamp near the couch.",
+  numPts:"One patient.",
+  moi:"Partner states she fell down the stairs. No stairs inside the apartment.",
+  noi:"No medical complaint apparent. This is an injury.",
+  ccLt:"Chief complaint: face and left wrist pain. No immediate life threats.",
+  smr:"Patient is ambulatory, no neck pain, no neuro deficits, reliable: spinal immobilization not indicated. (Neck marks are hand prints. No spinal injury indicated.)",
+  bleed:"No major bleeding. Small split in the lower lip, not actively bleeding.",
+  partnerHere(){ return !SIM.fired.pdarrive; },
+  open(){ return SIM.F.private && !SIM.F.shutdown; },
+  compute(m, F){
+    let pain = 7;
+    const sp = firstTx(F, "splint_ue"), cp = firstTx(F, "cold_pack"), el = firstTx(F, "elevate");
+    if (sp !== null && m >= sp + 1) pain -= 2;
+    if (cp !== null && m >= cp + 2) pain -= 1;
+    if (el !== null && m >= el + 2) pain -= 1;
+    pain = Math.max(3, pain);
+    const ra = firstTx(F, "realign"); if (ra !== null && m >= ra && m < ra + 10) pain = 9;
+    const tense = !SIM.fired.pdarrive;
+    return { hr: tense ? 102 : 94, sbp:132, dbp:84, rr:18, spo2:99, bgl:104, E:4, V:5, M:6, swallow:true, pain,
+      temp:98.4, tempRoute:"oral", skin:"pink, warm, dry", pulseQ:"regular, strong", pupils:"PERRL, 3 mm; right eye swollen but opens. Vision intact both eyes.", lungs:"Clear and equal bilaterally." };
+  },
+  present(){
+    if (!SIM.fired.pdarrive) return "31 y/o female on the couch holding frozen peas to her right eye, cradling her left wrist, looking down. Her partner stands over her and answers for her.";
+    return "PD has the partner in the hallway. The patient is still on the couch, holding her wrist. She looks at the door, then at you.";
+  },
+  confused: () => false,
+  primary:{
+    gen_imp:"Young adult female sitting on a couch holding a cold pack to her face.",
+    airway:"Patent. No secretions. Voice slightly hoarse. Speaking in full sentences, quietly.",
+    breathing:S => `Rate ${S.rr}, ${rateWord(S.rr)}. Rhythm regular. Unlabored. Chest rise equal bilaterally, adequate depth.`,
+    swallow:"Gag intact. Swallows, but says it hurts a little."
+  },
+  ask(id, S){
+    const s = SCEN.dv, F = SIM.F, partner = s.partnerHere();
+    if (id === "ask_private") {
+      if (partner) return [["Partner","I'm not going anywhere. I'm her husband."]];
+      if (F.shutdown) return [["Patient","(shakes her head) I told you. I fell."]];
+      F.private = true;
+      return [["Patient","(takes a breath, looks at the door) ...Can I tell you what really happened?"]];
+    }
+    if (id === "ask_safe") {
+      if (partner) { F.shutdown = true; SIM.log.push({ t:SIM.t, a:"ev_shutdown" });
+        return [["Partner","(louder) What are you implying? She fell!"],["Patient","(looks at the floor) ...Yes. I'm safe. I fell."]]; }
+      if (s.open()) return [["Patient","(starts crying) No."]];
+      return [["Patient","(hesitates) ...I don't know."]];
+    }
+    if (id === "ask_bystander") return partner
+      ? [["Partner","I told you, she fell. She's clumsy."]]
+      : [["Neighbor","I heard him yelling and something smash. This isn't the first time."]];
+    const both = {
+      ask_id:"Danielle Reyes, R-E-Y-E-S. August 23rd, 1995. About 64 kilos.",
+      ask_o:"All at once.", ask_p:"Moving my wrist makes it worse.", ask_q:"Throbbing.", ask_s:`${S.pain} out of 10.`,
+      ask_t:"Maybe half an hour ago. Around 9:20.", ask_allergies:"No.", ask_meds:"Birth control. That's it.",
+      ask_intake:"Dinner around 7.", ask_anticoag:"No.", ask_pde5:"No."
+    };
+    const guarded = {
+      ask_cc:"My wrist and my face. I fell.", ask_r:"Left wrist. Right side of my face.",
+      ask_signs:"Just my wrist and my eye.", ask_pmh:"Nothing.", ask_loc:"No.", ask_neckpain:"No."
+    };
+    const open = {
+      ask_cc:"My wrist really hurts. And my face. And my throat.", ask_r:"Left wrist, my face... and my neck is sore.",
+      ask_signs:"My wrist, my eye, and it hurts to swallow. My voice sounds weird.",
+      ask_pmh:"Nothing. ...I broke my finger last year. I said I shut it in a door.",
+      ask_events:"He pushed me into the kitchen counter and hit me in the face. Then he grabbed my neck with both hands. I couldn't breathe for a few seconds.",
+      ask_loc:"I don't think so. Everything went fuzzy for a second when he had my neck.",
+      ask_neckpain:"My throat hurts. Not my spine."
+    };
+    if (id === "ask_events" && !s.open()) return partner
+      ? [["Partner","She fell down the stairs outside."],["Patient","...Yeah. I fell."]]
+      : [["Patient","...I fell. Down the stairs outside."]];
+    const txt = both[id] || (s.open() ? open[id] : guarded[id]);
+    return PT(txt || "No.");
+  },
+  exam:{
+    ex_head:"Swelling and purple bruising around the right eye; eye opens. 1 cm split in the lower lip. No scalp injury.",
+    ex_neck:"Faint red hand-print marks on both sides of the front of the neck. Mild tenderness over the front of the throat. Voice slightly hoarse. No midline spine tenderness.",
+    ex_ue:"Left wrist swollen and tender, no deformity, no open wound. A row of oval bruises on the right upper arm (grab marks). Older yellow-green bruises on the left forearm.",
+    ex_le:"No injury. No scrapes or bruises on the knees or shins.",
+    ex_chest:"No injury.", ex_abd:"Soft, non-tender. No bruising.", ex_back:"No injury.", ex_pelvis:"Stable, non-tender.",
+    ex_pms_ue:"Radial pulses present both sides. Left grip weak from pain. Sensation intact in both hands.",
+    ex_pms_le:"Pedal pulses present and equal. Wiggles toes. Sensation intact in both feet.",
+    ex_stroke:"No facial droop or arm drift. Speech clear, slightly hoarse."
+  },
+  onTreat(id){
+    if (id === "realign") return { text:"You pull on the wrist to straighten it. She cries out. Pain 9/10.", alert:true };
+    return null;
+  },
+  events:[]
+},
+
 /* ----------------------------------------------------------------- BAR */
 bar: {
   id:"bar", code:"3", nature:"Assault – head pain",
@@ -1225,7 +1335,7 @@ function doAction(id, param){
     addFeed(t0, "act", a.label, esc((s.dx && s.dx.check_med) || "No patient medication available to check."));
     SIM.t = t0 + a.cost; afterAdvance(); render(); save(); return;
   }
-  let dxr = (s.dx && s.dx[id]) || (a.group !== "treat" ? DX[id] : null);
+  let dxr = (s.handles && s.handles.includes(id)) ? null : (s.dx && s.dx[id]) || (a.group !== "treat" ? DX[id] : null);
   if (typeof dxr === "function") dxr = dxr(st);
   if (id === "req_pd" && s.pdArrives && SIM.pdReqT == null) SIM.pdReqT = t0;
   if (dxr && a.group !== "treat") {
@@ -1793,7 +1903,7 @@ document.addEventListener("change", e => {
 /* ---------- start screen ---------- */
 let pick = null;
 /* Call codes are stored hashed so they can't be read from the page source. Codes: see instructor notes. */
-const CODE_HASH = { "748ff6b1":"ams", "e5b4e465":"cp", "5ab06816":"fall", "75ccef53":"toe", "05d0faef":"bar", "4a676b45":"ana" };
+const CODE_HASH = { "748ff6b1":"ams", "e5b4e465":"cp", "5ab06816":"fall", "75ccef53":"toe", "05d0faef":"bar", "4a676b45":"ana", "637295d0":"dv" };
 function codeToScenario(code){ const c = String(code||"").trim().toUpperCase().replace(/\s+/g,""); return c ? CODE_HASH[fnv("epcr|" + c)] || null : null; }
 function renderStart(){
   const sidNow = $("#s_id").value.trim();
