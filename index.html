@@ -1367,6 +1367,12 @@ function doAction(id, param){
     else if (id === "lungs") r = st.lungs;
     else { r = P[id]; if (typeof r === "function") r = r(st); }
     lines.push(["", r || "No abnormality found."]);
+    if (id === "avpu" && st.E === 4 && PT_NAMES[SIM.sc]) {
+      /* an alert patient states their name; a confused one gets out only a first name */
+      const full = PT_NAMES[SIM.sc], first = full.split(" ")[0];
+      lines.push(["Patient", (s.confused(st) || st.V < 5) ? `...${first}.` : `My name is ${full}.`]);
+      entry.x = (s.confused(st) || st.V < 5) ? "first" : "name";
+    }
     entry.s = snap(st);
   } else if (a.group === "history") {
     lines = s.ask(id, st);
